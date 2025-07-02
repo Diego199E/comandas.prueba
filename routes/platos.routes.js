@@ -1,0 +1,21 @@
+const express = require('express');
+const router = express.Router();
+const { 
+    obtenerPlatos,
+    agregarPlato,
+    actualizarPlato,
+    eliminarPlato,
+} = require('../controllers/platos.controller');
+const { verificarToken } = require('../middlewares/auth.middleware')
+const { permitirRoles } = require('../middlewares/rol.middleware')
+const {verificarEmpresaActiva} = require('../middlewares/empresa.middleware');
+
+// Protegida para todos los usuarios activos
+router.get('/', verificarToken, verificarEmpresaActiva, obtenerPlatos);
+
+// Solo admins con empresa activa pueden modificar platos
+router.post('/', verificarToken, permitirRoles('Admin'), agregarPlato);
+router.put('/:id', verificarToken, permitirRoles('Admin'), actualizarPlato);
+router.delete('/:id', verificarToken, permitirRoles('Admin'), eliminarPlato);
+
+module.exports = router;

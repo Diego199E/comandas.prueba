@@ -12,9 +12,10 @@ app.get('/', (req, res) => {
   res.send('Hola desde el backend con Express 🚀');
 });
 
-// Ruta de comandas
-const comandasRoute = require('./routes/comandas.routes');
-app.use('/api/comandas', comandasRoute);
+
+// Ruta de empresa
+const empresaRoutes = require('./routes/empresa.routes');
+app.use('/api/empresa', empresaRoutes);
 
 // Ruta de autenticacion
 const authRoutes = require('./routes/auth.routes');
@@ -25,7 +26,11 @@ const usuariosRoutes = require('./routes/usuarios.routes');
 app.use('/api/usuarios', usuariosRoutes);
 
 //Ruta de productos
-const productosRoutes = require('./routes/productos.routes');
-app.use('/api/productos', productosRoutes);
+const platosRoutes = require('./routes/platos.routes');
+app.use('/api/platos', platosRoutes);
+
+// Ruta de comandas
+const comandasRoute = require('./routes/comandas.routes');
+app.use('/api/comandas', comandasRoute);
 
 module.exports = app;
