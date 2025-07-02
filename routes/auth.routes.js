@@ -8,14 +8,8 @@ const { permitirRoles } = require('../middlewares/rol.middleware');
 
 // Ruta para el login y registro
 
-
-
-// Solo admins pueden crear usuarios
 router.post(
   '/register',
-  verificarToken,
-  verificarEmpresaActiva,
-  permitirRoles("Admin"),
   registrar,
 );
 
