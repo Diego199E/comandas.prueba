@@ -14,7 +14,7 @@ const {verificarEmpresaActiva} = require('../middlewares/empresa.middleware');
 router.get('/', verificarToken, verificarEmpresaActiva, obtenerPlatos);
 
 // Solo admins con empresa activa pueden modificar platos
-router.post('/', verificarToken, permitirRoles('Admin'), agregarPlato);
+router.post('/', verificarToken,verificarEmpresaActiva ,permitirRoles('Admin'), agregarPlato);
 router.put('/:id', verificarToken, permitirRoles('Admin'), actualizarPlato);
 router.delete('/:id', verificarToken, permitirRoles('Admin'), eliminarPlato);
 

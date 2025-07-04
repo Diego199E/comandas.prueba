@@ -7,9 +7,20 @@ const empresaSchema = new mongoose.Schema({
     unique: true,
     trim: true
   },
+  nit: {
+    type: String,
+    unique: true,
+    required: true,
+    trim: true
+  },
+  razonSocial: {
+    type: String,
+    required: true,
+    trim: true
+  },
   pagoRealizado: {
     type: Boolean,
-    default: false  // false = no ha pagado, true = pagó
+    default: false
   },
   activa: {
     type: Boolean,

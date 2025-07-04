@@ -3,7 +3,8 @@ const router = express.Router();
 const {
     getComandas,
     crearComanda,
-    completarComanda
+    completarComanda,
+    eliminarComanda
 } = require('../controllers/comandas.controller');
 
 const { verificarToken } = require('../middlewares/auth.middleware');
@@ -22,5 +23,7 @@ router.post('/', crearComanda);
 
 // Marcar como completada (por ahora se usa DELETE, pero semánticamente sería mejor un PUT o PATCH)
 router.patch('/:id',completarComanda);
+
+router.delete('/:id',eliminarComanda);
 
 module.exports = router;
