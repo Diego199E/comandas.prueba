@@ -11,6 +11,7 @@ const { verificarToken } = require('../middlewares/auth.middleware');
 
 const {verificarEmpresaActiva} = require('../middlewares/empresa.middleware');
 
+
 // Protege todas las rutas con token y empresa activa
 router.use(verificarToken, verificarEmpresaActiva);
 

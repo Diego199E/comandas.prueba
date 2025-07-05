@@ -5,14 +5,16 @@ const Empresa = require('../models/empresa.model');
 const getComandas = async (req, res) => {
   try {
     const comandas = await Comanda.find({
-      estado: false,
-      empresa: req.usuario.empresa, // Solo de su empresa
-    });
+      empresa: req.usuario.empresa,
+    }).populate("usuario", "nombre");
     res.json(comandas);
   } catch (error) {
+    console.error("Error al obtener comandas:", error); // IMPORTANTE
     res.status(500).json({ mensaje: 'Error al obtener comandas' });
   }
 };
+
+
 
 const crearComanda = async (req, res) => {
   try {
@@ -29,6 +31,8 @@ const crearComanda = async (req, res) => {
       empresa: req.usuario.empresa,
       nitEmpresa: empresa.nit || "",
       razonSocialEmpresa: empresa.razonSocial || "",
+      usuario: req.usuario._id, // ← esto permite luego usar populate("usuario")
+      usaIva: empresa.usaIva || false,
     });
 
     await nuevaComanda.save();

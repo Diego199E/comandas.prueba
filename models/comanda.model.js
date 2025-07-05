@@ -1,4 +1,3 @@
-// comanda.model.js
 const mongoose = require("mongoose");
 
 const comandasSchema = new mongoose.Schema({
@@ -7,6 +6,7 @@ const comandasSchema = new mongoose.Schema({
     {
       nombre: { type: String, required: true },
       productos: { type: [String], required: true },
+      precio: { type: Number, required: true },
     },
   ],
   estado: { type: Boolean, default: false },
@@ -20,8 +20,16 @@ const comandasSchema = new mongoose.Schema({
 
   nitEmpresa: { type: String },
   razonSocialEmpresa: { type: String },
-},
-{
+
+  // 👇 Nuevo campo para saber qué mesero creó la comanda
+  usuario: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Usuario",
+  },
+
+  usaIva: { type: Boolean, default: true },
+  
+}, {
   collection: "comandas"
 });
 

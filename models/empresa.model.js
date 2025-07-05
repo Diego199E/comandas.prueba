@@ -25,7 +25,9 @@ const empresaSchema = new mongoose.Schema({
   activa: {
     type: Boolean,
     default: true
-  }
+  },
+  usaIva: { type: Boolean, default: true },
+
 }, { timestamps: true });
 
 module.exports = mongoose.model('Empresa', empresaSchema);

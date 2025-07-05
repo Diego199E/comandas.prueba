@@ -8,7 +8,7 @@ const platoSchema = new mongoose.Schema({
     seleccionable: { type: Boolean, default: true }
   }],
   precio: { type: Number, required: true },
-  cantidad: { type: Number, required: true },
+  cantidad: { type: Number},
   disponible: { type: Boolean, default: true },
   empresa: {
     type: mongoose.Schema.Types.ObjectId,
