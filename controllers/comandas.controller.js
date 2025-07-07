@@ -74,10 +74,29 @@ const eliminarComanda = async (req, res) => {
   }
 };
 
+// Borra todas las comandas de la empresa actual
+const eliminarTodasLasComandas = async (req, res) => {
+  try {
+    const empresaId = req.usuario.empresa;
+    await Comanda.deleteMany({ empresa: empresaId });
+    res.json({ mensaje: "Todas las comandas fueron eliminadas correctamente" });
+  } catch (error) {
+    console.error("❌ Error al eliminar todas las comandas:", error);
+    res.status(500).json({ mensaje: "Error al eliminar todas las comandas" });
+  }
+};
+
+module.exports = {
+  // otros controladores...
+  eliminarTodasLasComandas,
+};
+
+
 
 module.exports = {
   getComandas,
   crearComanda,
   completarComanda,
   eliminarComanda,
+  eliminarTodasLasComandas,
 };

@@ -4,7 +4,8 @@ const {
     getComandas,
     crearComanda,
     completarComanda,
-    eliminarComanda
+    eliminarComanda,
+    eliminarTodasLasComandas
 } = require('../controllers/comandas.controller');
 
 const { verificarToken } = require('../middlewares/auth.middleware');
@@ -26,5 +27,7 @@ router.post('/', crearComanda);
 router.patch('/:id',completarComanda);
 
 router.delete('/:id',eliminarComanda);
+
+router.delete('/',eliminarTodasLasComandas);
 
 module.exports = router;
