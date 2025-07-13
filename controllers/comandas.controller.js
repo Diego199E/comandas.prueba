@@ -43,6 +43,31 @@ const crearComanda = async (req, res) => {
   }
 };
 
+const editarComanda = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { platillos } = req.body;
+
+    const comanda = await Comanda.findOne({
+      _id: id,
+      empresa: req.usuario.empresa, // garantiza que no edite otra empresa
+    });
+
+    if (!comanda) {
+      return res.status(404).json({ mensaje: "Comanda no encontrada" });
+    }
+
+    comanda.platillos = platillos;
+    await comanda.save();
+
+    res.json({ mensaje: "✅ Comanda actualizada con éxito", comanda });
+  } catch (error) {
+    console.error("❌ Error al editar comanda:", error);
+    res.status(500).json({ mensaje: "Error al editar comanda" });
+  }
+};
+
+
 const completarComanda = async (req, res) => {
   try {
     const { id } = req.params;
@@ -96,6 +121,7 @@ module.exports = {
 module.exports = {
   getComandas,
   crearComanda,
+  editarComanda,
   completarComanda,
   eliminarComanda,
   eliminarTodasLasComandas,

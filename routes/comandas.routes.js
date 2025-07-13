@@ -1,33 +1,37 @@
 const express = require('express');
 const router = express.Router();
+
 const {
-    getComandas,
-    crearComanda,
-    completarComanda,
-    eliminarComanda,
-    eliminarTodasLasComandas
+  getComandas,
+  crearComanda,
+  completarComanda,
+  eliminarComanda,
+  eliminarTodasLasComandas,
+  editarComanda, // ✅ asegurado
 } = require('../controllers/comandas.controller');
 
 const { verificarToken } = require('../middlewares/auth.middleware');
+const { verificarEmpresaActiva } = require('../middlewares/empresa.middleware');
 
-const {verificarEmpresaActiva} = require('../middlewares/empresa.middleware');
-
-
-// Protege todas las rutas con token y empresa activa
+// ✅ Aplica protección a todas las rutas de comandas
 router.use(verificarToken, verificarEmpresaActiva);
 
+// ✅ Obtener todas las comandas (activas o no) de la empresa
+router.get('/', getComandas);
 
-// Obtener todas las comandas activas (no completadas) de la empresa
-router.get('/',getComandas);
-
-// Crear una nueva comanda asociada a la empresa del usuario
+// ✅ Crear una nueva comanda
 router.post('/', crearComanda);
 
-// Marcar como completada (por ahora se usa DELETE, pero semánticamente sería mejor un PUT o PATCH)
-router.patch('/:id',completarComanda);
+// ✅ Editar una comanda existente (por ejemplo, cambiar un plato)
+router.put('/:id', editarComanda);
 
-router.delete('/:id',eliminarComanda);
+// ✅ Marcar una comanda como completada
+router.patch('/:id', completarComanda);
 
-router.delete('/',eliminarTodasLasComandas);
+// ✅ Eliminar una comanda
+router.delete('/:id', eliminarComanda);
+
+// ✅ Eliminar todas las comandas de la empresa actual
+router.delete('/', eliminarTodasLasComandas);
 
 module.exports = router;
