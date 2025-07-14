@@ -26,7 +26,16 @@ app.use('/api/auth', authRoutes);
 const usuariosRoutes = require('./routes/usuarios.routes');
 app.use('/api/usuarios', usuariosRoutes);
 
-//Ruta de productos
+
+//Nueva ruta de ingredientes, productos y menu
+const ingredientesRoutes = require('./routes/ingredientes.routes');
+app.use('/api/ingredientes', ingredientesRoutes);
+
+const productosRoutes = require('./routes/productos.routes');
+app.use('/api/productos', productosRoutes);
+
+
+//Ruta de platos
 const platosRoutes = require('./routes/platos.routes');
 app.use('/api/platos', platosRoutes);
 
