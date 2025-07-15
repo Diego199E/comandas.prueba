@@ -25,6 +25,7 @@ const productoSchema = new mongoose.Schema({
     ref: 'Empresa',
     required: true,
   },
+
 }, { timestamps: true });
 
 module.exports = mongoose.model('Producto', productoSchema);

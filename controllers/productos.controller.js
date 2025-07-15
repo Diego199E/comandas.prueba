@@ -1,3 +1,4 @@
+import Inventario from "../models/ingrediente.model.js";
 import Producto from "../models/producto.model.js";
 
 // Crear producto
