@@ -1,5 +1,7 @@
 const Comanda = require('../models/comanda.model');
 const Empresa = require('../models/empresa.model');
+const { descontarIngredientesComanda } = require('./inventario.controller');
+
 
 // Obtener comandas solo de la empresa del usuario y no completadas
 const getComandas = async (req, res) => {
@@ -71,17 +73,22 @@ const editarComanda = async (req, res) => {
 const completarComanda = async (req, res) => {
   try {
     const { id } = req.params;
-    const comanda = await Comanda.findByIdAndUpdate(
-      id,
-      { estado: true },
-      { new: true }
-    );
+    
+    const comanda = await Comanda.findById(id);
     if (!comanda) return res.status(404).json({ mensaje: 'Comanda no encontrada' });
-    res.json({ mensaje: 'Comanda marcada como completada' });
+
+    comanda.estado = true;
+    await comanda.save();
+
+    await descontarIngredientesComanda(comanda._id);
+
+    res.json({ mensaje: 'Comanda marcada como completada y stock descontado' });
   } catch (error) {
+    console.error("Error al completar comanda:", error);
     res.status(500).json({ mensaje: 'Error al completar comanda' });
   }
 };
+
 
 const eliminarComanda = async (req, res) => {
   try {
