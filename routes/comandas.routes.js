@@ -7,7 +7,8 @@ const {
   completarComanda,
   eliminarComanda,
   eliminarTodasLasComandas,
-  editarComanda, // ✅ asegurado
+  editarComanda,
+  marcarComoImpresa,
 } = require('../controllers/comandas.controller');
 
 const { verificarToken } = require('../middlewares/auth.middleware');
@@ -21,6 +22,9 @@ router.get('/', getComandas);
 
 // ✅ Crear una nueva comanda
 router.post('/', crearComanda);
+
+// ✅ Marcar una comanda como impresa
+router.patch('/:id/imprimir', marcarComoImpresa);
 
 // ✅ Editar una comanda existente (por ejemplo, cambiar un plato)
 router.put('/:id', editarComanda);

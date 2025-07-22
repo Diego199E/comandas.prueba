@@ -118,9 +118,28 @@ const eliminarTodasLasComandas = async (req, res) => {
   }
 };
 
-module.exports = {
-  // otros controladores...
-  eliminarTodasLasComandas,
+//para imprimir desde app y marcar una comanda como impresa
+
+const marcarComoImpresa = async (req, res) => {
+  try {
+    const comandaId = req.params.id;
+    const empresaId = req.usuario.empresa;
+
+    const comanda = await Comanda.findOneAndUpdate(
+      { _id: comandaId, empresa: empresaId },
+      { impresa: true },
+      { new: true }
+    );
+
+    if (!comanda) {
+      return res.status(404).json({ mensaje: "Comanda no encontrada o no pertenece a tu empresa" });
+    }
+
+    res.json({ mensaje: "✅ Comanda marcada como impresa", comanda });
+  } catch (error) {
+    console.error("❌ Error al marcar como impresa:", error);
+    res.status(500).json({ mensaje: "Error al marcar la comanda como impresa" });
+  }
 };
 
 
@@ -132,4 +151,5 @@ module.exports = {
   completarComanda,
   eliminarComanda,
   eliminarTodasLasComandas,
+  marcarComoImpresa,
 };

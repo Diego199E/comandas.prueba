@@ -28,6 +28,8 @@ const comandasSchema = new mongoose.Schema({
   },
 
   usaIva: { type: Boolean, default: true },
+
+  impresa: { type: Boolean, default: false },
   
 }, {
   collection: "comandas"
