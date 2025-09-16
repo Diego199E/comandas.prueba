@@ -43,4 +43,8 @@ app.use('/api/platos', platosRoutes);
 const comandasRoute = require('./routes/comandas.routes');
 app.use('/api/comandas', comandasRoute);
 
+// Ruta de menues (menú público y privado)
+const menuesRoutes = require('./routes/menues.routes');
+app.use('/api/menues', menuesRoutes);
+
 module.exports = app;

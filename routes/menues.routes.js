@@ -1,20 +1,23 @@
-import express from "express";
-import {
+// routes/menues.routes.js
+const express = require("express");
+const {
   crearPlatoMenu,
   obtenerPlatosMenu,
   actualizarPlatoMenu,
-  eliminarPlatoMenu
-} from "../controllers/menues.controller.js";
-import verificarToken from "../middlewares/auth.middleware.js";
-import verificarEmpresaActiva from "../middlewares/empresa.middleware.js";
+  eliminarPlatoMenu,
+  obtenerPlatosMenuPublico,
+} = require("../controllers/menues.controller.js");
 
 const router = express.Router();
 
-//router.use(verificarToken, verificarEmpresaActiva);
-
+// Privadas
 router.post("/", crearPlatoMenu);
 router.get("/", obtenerPlatosMenu);
 router.put("/:id", actualizarPlatoMenu);
 router.delete("/:id", eliminarPlatoMenu);
+
+// Pública (landing page sin token)
+router.get("/public/:slug", obtenerPlatosMenuPublico);
+
 
 module.exports = router;
