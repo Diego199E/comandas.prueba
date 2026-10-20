@@ -13,6 +13,7 @@ const {
 
 const { verificarToken } = require('../middlewares/auth.middleware');
 const { verificarEmpresaActiva } = require('../middlewares/empresa.middleware');
+const { permitirRoles } = require('../middlewares/rol.middleware');
 
 // ✅ Aplica protección a todas las rutas de comandas
 router.use(verificarToken, verificarEmpresaActiva);
@@ -35,7 +36,7 @@ router.patch('/:id', completarComanda);
 // ✅ Eliminar una comanda
 router.delete('/:id', eliminarComanda);
 
-// ✅ Eliminar todas las comandas de la empresa actual
-router.delete('/', eliminarTodasLasComandas);
+// ✅ Eliminar todas las comandas de la empresa actual (solo Admin)
+router.delete('/', permitirRoles('Admin'), eliminarTodasLasComandas);
 
 module.exports = router;

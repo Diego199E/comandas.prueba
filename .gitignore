@@ -1,1 +1,19 @@
+# Dependencias
+node_modules/
+
+# Builds
+dist/
+
+# Variables de entorno (nunca versionar credenciales reales)
 .env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema / editores
+.DS_Store
+.vscode/*
+.idea
