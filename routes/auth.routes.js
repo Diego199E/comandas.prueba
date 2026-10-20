@@ -5,9 +5,19 @@ const Usuario = require('../models/usuario.model');
 const { verificarToken } = require('../middlewares/auth.middleware');
 const { registrar, login } = require('../controllers/auth.controller');
 const { permitirRoles } = require('../middlewares/rol.middleware');
+const { limitarPeticiones } = require('../middlewares/rateLimit');
 
-// Login: publica por definicion.
-router.post('/login', login);
+// Login: publica por definicion, pero con limite de intentos para evitar
+// ataques de fuerza bruta contra las contrasenas.
+router.post(
+  '/login',
+  limitarPeticiones({
+    maximo: 10,
+    ventanaMs: 15 * 60 * 1000,
+    mensaje: 'Demasiados intentos de inicio de sesión. Intenta de nuevo en unos minutos.',
+  }),
+  login
+);
 
 // Crear usuarios dentro de la empresa:
 // SOLO un Admin autenticado puede hacerlo, y el usuario queda siempre

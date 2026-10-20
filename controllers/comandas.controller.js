@@ -99,7 +99,13 @@ function validarComanda({ mesa, platillos }) {
   return null;
 }
 
-// Obtener comandas solo de la empresa del usuario y no completadas
+/**
+ * Obtiene las comandas de la empresa.
+ *
+ * Devuelve TODAS las comandas (completadas y pendientes): el panel
+ * administrativo necesita el historial para los reportes y el cliente filtra
+ * las pendientes por su cuenta.
+ */
 const getComandas = async (req, res) => {
   try {
     const comandas = await Comanda.find(filtroEmpresa(req)).populate('usuario', 'nombre');

@@ -27,9 +27,15 @@ const empresaSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
-  usaIva: { 
-    type: Boolean, 
-    default: true 
+  // usaIva: true  -> la empresa aplica IVA del 19%.
+  //         false -> aplica el INC del 8% (regimen habitual de los
+  //                   restaurantes en Colombia, Ley 2277 de 2023).
+  // Por eso el valor por defecto es false: un restaurante aplica INC.
+  // ANTES el default era true, lo que hacia que los recibos se calcularan
+  // con 19% mientras el texto legal del comprobante hablaba de INC 8%.
+  usaIva: {
+    type: Boolean,
+    default: false
   },
 
   // 👇 Campo nuevo

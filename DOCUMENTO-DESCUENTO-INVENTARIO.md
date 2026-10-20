@@ -213,7 +213,8 @@ el descuento solo genera más inconsistencias. Lo que se hace es avisar.
 
 ## 7. Verificación
 
-Suite de 23 pruebas end-to-end en `scripts/verificar-inventario.js`:
+Suite de pruebas automatizadas en `test/inventario.test.js` (runner nativo de
+Node, `node --test`):
 
 | Caso | Resultado esperado |
 |---|---|
@@ -230,17 +231,13 @@ Suite de 23 pruebas end-to-end en `scripts/verificar-inventario.js`:
 | La comanda guardada | `stockDescontado = true` con su fecha |
 
 ```bash
-# Con el backend corriendo en otra terminal:
 cd Backend
-npm run verificar:inventario
+npm test
 ```
 
-La suite crea su propia empresa de prueba y la elimina al final, así que no
-tocan los datos reales.
-
-> La suite permanente de pruebas unitarias (`node --test`) está pendiente:
-> el comando `npm test` ya está configurado, pero la carpeta `test/` todavía
-> no existe.
+Las pruebas levantan la API en un puerto libre dentro del propio proceso, no
+necesitan el servidor corriendo en otra terminal. Cada prueba crea su propia
+empresa de prueba y la elimina al final, así que no tocan los datos reales.
 
 ---
 
