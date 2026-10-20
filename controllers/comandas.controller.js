@@ -1,7 +1,12 @@
 // controllers/comandas.controller.js
 const Comanda = require('../models/comanda.model');
 const Empresa = require('../models/empresa.model');
-const { descontarIngredientesComanda } = require('./inventario.controller');
+const Producto = require('../models/producto.model');
+const mongoose = require('mongoose');
+const {
+  descontarIngredientesComanda,
+  revertirEnSession,
+} = require('./inventario.controller');
 
 const { filtroEmpresa, empresaIdDe } = require('../utils/scope');
 const { soloCampos } = require('../utils/campos');
@@ -9,6 +14,39 @@ const { soloCampos } = require('../utils/campos');
 // Comanda: que campos puede escribir el cliente. 'empresa', '_id', 'estado' e
 // 'impresa' quedan FUERA a proposito: son de control del servidor.
 const CAMPOS_COMANDA = ['mesa', 'platillos'];
+
+/**
+ * Resuelve los nombres de producto elegidos en cada platillo a sus ids
+ * reales de Producto.
+ *
+ * Se hace al crear y al editar la comanda, para que el descuento de
+ * inventario no dependa del texto: si despues se renombra un producto, la
+ * comanda sigue apuntando al producto correcto.
+ *
+ * @returns {Promise<Array>} platillos con el campo productosResueltos
+ */
+async function resolverProductos(platillos, empresaId) {
+  const nombres = new Set();
+  for (const platillo of platillos) {
+    for (const nombre of platillo.productos || []) nombres.add(nombre);
+  }
+
+  if (nombres.size === 0) {
+    return platillos.map((p) => ({ ...p, productosResueltos: [] }));
+  }
+
+  const productos = await Producto.find({ empresa: empresaId, nombre: { $in: [...nombres] } })
+    .select('_id nombre');
+
+  const porNombre = new Map(productos.map((p) => [p.nombre, p._id]));
+
+  return platillos.map((platillo) => ({
+    ...platillo,
+    productosResueltos: (platillo.productos || [])
+      .filter((nombre) => porNombre.has(nombre))
+      .map((nombre) => ({ nombre, producto: porNombre.get(nombre) })),
+  }));
+}
 
 /**
  * Quita del payload los campos que un rol no debe ver.
@@ -90,9 +128,11 @@ const crearComanda = async (req, res) => {
       return res.status(400).json({ mensaje: 'Empresa no encontrada' });
     }
 
+    const platillosResueltos = await resolverProductos(platillos, empresaIdDe(req));
+
     const nuevaComanda = new Comanda({
       mesa: mesa.trim(),
-      platillos,
+      platillos: platillosResueltos,
       empresa: empresaIdDe(req),
       nitEmpresa: empresa.nit || '',
       razonSocialEmpresa: empresa.razonSocial || '',
@@ -124,7 +164,7 @@ const editarComanda = async (req, res) => {
       return res.status(404).json({ mensaje: 'Comanda no encontrada' });
     }
 
-    comanda.platillos = platillos;
+    comanda.platillos = await resolverProductos(platillos, empresaIdDe(req));
     await comanda.save();
 
     res.json({ mensaje: '✅ Comanda actualizada con éxito', comanda });
@@ -138,19 +178,48 @@ const completarComanda = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Sin filtro por empresa, un usuario de la empresa A podria completar (y
-    // descontar inventario de) una comanda de la empresa B.
-    const comanda = await Comanda.findOne(filtroEmpresa(req, { _id: id }));
+    // Transicion ATOMICA e idempotente: estado -> true.
+    // Solo la peticion que logra la transicion sigue adelante; las demas
+    // detectan que la comanda ya estaba completada.
+    //
+    // OJO: el filtro usa {estado: {$ne: true}} y no {estado: false} porque
+    // en MongoDB {campo: false} NO matchea un documento al que le falta el
+    // campo, y las comandas viejas podrian no tenerlo.
+    const comanda = await Comanda.findOneAndUpdate(
+      filtroEmpresa(req, { _id: id, estado: { $ne: true } }),
+      { $set: { estado: true } },
+      { new: true }
+    );
+
     if (!comanda) {
-      return res.status(404).json({ mensaje: 'Comanda no encontrada' });
+      const existente = await Comanda.findOne(filtroEmpresa(req, { _id: id }));
+      if (!existente) {
+        return res.status(404).json({ mensaje: 'Comanda no encontrada' });
+      }
+
+      // Ya estaba completada. Se vuelve a intentar el descuento (que es
+      // idempotente) por si la vez anterior fallo a mitad de camino y el
+      // stock quedo sin descontar.
+      const stock = await descontarIngredientesComanda(existente._id);
+      const actualizada = await Comanda.findById(existente._id);
+
+      return res.json({
+        mensaje: 'La comanda ya estaba completada',
+        comanda: actualizada,
+        stock,
+      });
     }
 
-    comanda.estado = true;
-    await comanda.save();
+    // Descuento de inventario. Es idempotente: se aplica como maximo una vez
+    // por comanda, aunque se llame muchas veces.
+    const stock = await descontarIngredientesComanda(comanda._id);
+    const actualizada = await Comanda.findById(comanda._id);
 
-    await descontarIngredientesComanda(comanda._id);
-
-    res.json({ mensaje: 'Comanda marcada como completada y stock descontado' });
+    res.json({
+      mensaje: 'Comanda marcada como completada',
+      comanda: actualizada,
+      stock,
+    });
   } catch (error) {
     console.error('Error al completar comanda:', error);
     res.status(500).json({ mensaje: 'Error al completar comanda' });
@@ -161,13 +230,37 @@ const eliminarComanda = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Sin filtro por empresa, se podrian borrar comandas de otras empresas.
-    const comanda = await Comanda.findOneAndDelete(filtroEmpresa(req, { _id: id }));
-    if (!comanda) {
+    const session = await mongoose.startSession();
+    let comandaEliminada = null;
+    let stock = null;
+
+    try {
+      await session.withTransaction(async () => {
+        const comanda = await Comanda.findOne(filtroEmpresa(req, { _id: id })).session(session);
+        if (!comanda) return;
+
+        // Si el stock ya se habia descontado, se devuelve al inventario. Va en
+        // la MISMA transaccion que el borrado (MongoDB no permite anidar
+        // transacciones) para que no quede stock devuelto sin comanda
+        // borrada, ni comanda borrada sin devolver el stock.
+        if (comanda.stockDescontado) {
+          stock = await revertirEnSession(session, id);
+        }
+
+        comandaEliminada = await Comanda.findOneAndDelete(filtroEmpresa(req, { _id: id })).session(session);
+      });
+    } finally {
+      await session.endSession();
+    }
+
+    if (!comandaEliminada) {
       return res.status(404).json({ mensaje: 'Comanda no encontrada' });
     }
 
-    res.json({ mensaje: '✅ Comanda eliminada con éxito' });
+    res.json({
+      mensaje: '✅ Comanda eliminada con éxito',
+      stockRevertido: stock?.revertido || false,
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ mensaje: '❌ Error al eliminar comanda' });
