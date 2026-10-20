@@ -236,9 +236,9 @@ Están documentadas en detalle en los documentos técnicos. Las principales:
 2. **Las mesas ya son persistentes** (viven en la base de datos y conservan el
    borrador del pedido), pero **no hay un modelo de salón**: no hay capacidad
    por mesa, ni reserva de clientes, ni turno de apertura y cierre.
-3. **Un plato enviado sin opciones no descuenta stock.** Se avisa, pero falta
-   definir la regla de negocio ("si el cliente no elige, se descuenta el
-   producto principal").
+3. **Un plato sin composición registrada no puede descontarse.** Con la
+   composición por defecto (el plato se prepara tal como está diseñado), esto
+   solo pasa si el plato no tiene `contenido` en el catálogo.
 4. **El stock se descuenta al enviar el pedido** (reserva), no al servirlo:
    desde que el pedido entra a cocina ese stock ya no está disponible para
    otra mesa. Como contrapartida, **el inventario no distingue entre lo que

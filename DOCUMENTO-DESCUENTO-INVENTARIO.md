@@ -178,6 +178,51 @@ ingrediente. Ahora son **dos consultas en total** (productos + ingredientes) y
 
 ---
 
+## 4. Qué se descuenta: la composición del plato
+
+### La regla
+
+El `contenido` de un plato **es** su composición: para "Combo Hamburguesa"
+puede ser `Principio: Hamburguesa`, `Acompañamiento: Papas a la francesa`,
+`Bebida: Gaseosa`. El pedido se descuenta sobre **lo que el cliente pidió**.
+
+Cuando el mesero no elige ninguna opción, el plato se prepara **como está
+diseñado**: se descuentan todos sus componentes. Sin esta regla, el pedido se
+enviaba sin descontar nada y solo quedaba un aviso.
+
+### Dónde se aplica
+
+La regla vive en **dos capas**, y la del backend es la autoritativa:
+
+| Capa | Qué hace |
+|---|---|
+| **Frontend** (`useMesero`) | El modal de opciones abre con **todo seleccionado** (el plato tal como está diseñado) y el mesero **deselecciona** lo que el cliente no quiera. Las opciones fijas (`seleccionable: false`) no son botones: se muestran como "Incluye: ..." y siempre se preparian. |
+| **Backend** (`aplicarComposicionPorDefecto`) | Si un platillo llega sin productos, se busca el plato en el catálogo y se le aplica su `contenido` completo. El backend **no confía** en lo que le manden: un cliente de la API que envíe `productos: []` recibe la misma composición por defecto. |
+
+Si el plato **no tiene composición registrada** en el catálogo, entonces no se
+puede saber qué se preparó: no se descuenta nada y se deja el aviso
+("se envió sin productos seleccionados").
+
+### Cómo queda registrado
+
+La comanda guarda `productoPorDefecto: true` cuando la composición se asumió,
+para que el recibo refleje que **se asumió**, no que el cliente lo pidió así.
+
+### Verificado
+
+Con un combo de tres componentes (uno fijo) y 12 kg de harina:
+
+```
+El mesero abre el modal  ->  Hamburguesa [seleccionada], Gaseosa [seleccionada],
+                             "Incluye: Papas a la francesa"
+Deselecciona Gaseosa   ->  se prepara: Hamburguesa + Papas
+Se envía el pedido     ->  Harina 100 -> 90   (Hamburguesa: 10)
+                             Queso   50 -> 47   (Papas: 3)
+                             la Gaseosa NO se descontó
+```
+
+---
+
 ## 5. Reserva de stock: qué ve el mesero
 
 El descuento ocurre al **crear** la comanda, así que la respuesta del `POST`
@@ -297,10 +342,12 @@ empresa de prueba y la elimina al final, así que no tocan los datos reales.
    crea igual, el stock queda en negativo y se avisa. En un restaurante con
    datos de inventario imperfectos, bloquear pedidos es peor que avisar.
 
-4. **Un plato enviado sin opciones no descuenta nada.** No hay forma de saber
-   qué se preparó. Se avisa, pero la regla de negocio concreta ("si el cliente
-   no elige nada, se descuenta el producto principal") **no está definida** y
-   requiere un campo que distinga el producto principal de los acompañamientos.
+4. **Un plato enviado sin opciones ya no es un caso raro.** Con la
+   composición por defecto, solo queda sin descontar cuando el plato **no
+   tiene `contenido` registrado** en el catálogo. Sigue faltando una forma de
+   distinguir el "producto principal" cuando un combo tiene varios
+   componentes y el cliente quiere solo uno: hoy eso se resuelve
+   deseleccionando en el modal, no con un campo propio.
 
 5. **El precio no se recalcula desde el catálogo.** La comanda guarda el
    precio del platillo tal como se envió; si el administrador cambia el

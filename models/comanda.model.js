@@ -20,6 +20,11 @@ const comandasSchema = new mongoose.Schema({
           producto: { type: mongoose.Schema.Types.ObjectId, ref: "Producto" },
         },
       ],
+      // true cuando el plato se mando SIN opciones elegidas y el sistema
+      // asumio la composicion por defecto del plato (todo su contenido).
+      // Queda registrado para que el recibo refleje que se asumio, no que el
+      // cliente lo pidio asi.
+      productoPorDefecto: { type: Boolean, default: false },
       precio: { type: Number, required: true },
     },
   ],

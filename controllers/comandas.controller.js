@@ -2,6 +2,7 @@
 const Comanda = require('../models/comanda.model');
 const Empresa = require('../models/empresa.model');
 const Producto = require('../models/producto.model');
+const Plato = require('../models/plato.model');
 const Mesa = require('../models/mesa.model');
 const mongoose = require('mongoose');
 const {
@@ -15,6 +16,56 @@ const { soloCampos } = require('../utils/campos');
 // Comanda: que campos puede escribir el cliente. 'empresa', '_id', 'estado' e
 // 'impresa' quedan FUERA a proposito: son de control del servidor.
 const CAMPOS_COMANDA = ['mesa', 'platillos'];
+
+/**
+ * Aplica la composicion por defecto a los platillos que llegaron sin
+ * productos seleccionados.
+ *
+ * REGLA: si el mesero no eligio ninguna opcion, el plato se prepara como
+ * esta disenado: se descuentan TODOS los productos de su contenido (un combo
+ * completo, por ejemplo). Sin esto, el pedido se enviaba sin descontar nada y
+ * solo se avisaba.
+ *
+ * Es la version autoritativa: el frontend tambien precarga las opciones, pero
+ * el backend no confía en lo que le manden.
+ *
+ * @param {Array} platillos
+ * @param {string} empresaId
+ * @returns {Promise<Array>} los platillos con los productos por defecto
+ */
+async function aplicarComposicionPorDefecto(platillos, empresaId) {
+  const sinProductos = platillos.filter(
+    (p) => !p.productos || p.productos.length === 0
+  );
+
+  if (sinProductos.length === 0) return platillos;
+
+  const platos = await Plato.find({
+    empresa: empresaId,
+    nombre: { $in: sinProductos.map((p) => p.nombre) },
+  }).select('nombre contenido');
+
+  const porNombre = new Map(platos.map((p) => [p.nombre, p]));
+
+  return platillos.map((platillo) => {
+    if (platillo.productos && platillo.productos.length > 0) return platillo;
+
+    const plato = porNombre.get(platillo.nombre);
+    const contenido = plato?.contenido || [];
+
+    if (contenido.length === 0) {
+      // El plato no tiene composicion registrada: no se puede saber que se
+      // preparo. Se deja como esta y el descuento genera el aviso.
+      return platillo;
+    }
+
+    return {
+      ...platillo,
+      productos: contenido.map((c) => c.valor),
+      productoPorDefecto: true,
+    };
+  });
+}
 
 /**
  * Resuelve los nombres de producto elegidos en cada platillo a sus ids
@@ -184,7 +235,10 @@ const crearComanda = async (req, res) => {
       return res.status(400).json({ mensaje: 'Empresa no encontrada' });
     }
 
-    const platillosResueltos = await resolverProductos(platillos, empresaIdDe(req));
+    // Si el mesero no eligio opciones, el plato se prepara como esta disenado.
+    const conComposicion = await aplicarComposicionPorDefecto(platillos, empresaIdDe(req));
+
+    const platillosResueltos = await resolverProductos(conComposicion, empresaIdDe(req));
 
     const nuevaComanda = new Comanda({
       mesa: mesa.trim(),
@@ -247,7 +301,10 @@ const editarComanda = async (req, res) => {
       return res.status(404).json({ mensaje: 'Comanda no encontrada' });
     }
 
-    comanda.platillos = await resolverProductos(platillos, empresaIdDe(req));
+    comanda.platillos = await resolverProductos(
+      await aplicarComposicionPorDefecto(platillos, empresaIdDe(req)),
+      empresaIdDe(req)
+    );
     await comanda.save();
 
     res.json({ mensaje: '✅ Comanda actualizada con éxito', comanda });
