@@ -131,6 +131,23 @@ como **servida** desaparece de la pantalla y el backend descuenta el stock
 La cocina **nunca recibe los precios**: el backend los elimina de la respuesta
 para ese rol.
 
+### Aviso de pedido nuevo
+
+Cuando entra un pedido a cocina, la pantalla **suena un timbre** (dos tonos,
+generados con la Web Audio API: no hay ningún archivo de audio) y **resalta la
+tarjeta** con la etiqueta "NUEVO" durante 30 segundos, además de mostrar un
+banner arriba.
+
+Detalles que importan:
+
+- El sonido necesita un clic previo del usuario (política de autoplay de los
+  navegadores). El botón **"Activar sonido"** de la cabecera lo habilita.
+- **Al abrir la pantalla no suena**: solo avisa de los pedidos que entran
+  *después* de que la cocina ya la tenía abierta.
+- La preferencia queda guardada; se puede silenciar con el mismo botón.
+- El resaltado visual funciona aunque el sonido esté apagado, por si la
+  cocina está de espaldas o en un dispositivo sin audio.
+
 ### Reserva de stock
 
 El stock de los ingredientes de un pedido se descuenta **al enviarlo**, no al
@@ -246,5 +263,7 @@ Están documentadas en detalle en los documentos técnicos. Las principales:
    cuando no alcanza: se crea igual, el stock queda en negativo y se avisa.
 5. **El precio se guarda en la comanda** tal como se envió, para que los
    recibos históricos no cambien si el menú se actualiza.
-6. **La pantalla de cocina no tiene aviso sonoro** cuando entra un pedido
-   nuevo: el pedido aparece al refrescar, pero no hay "ding".
+6. **El aviso sonoro de la cocina requiere que el usuario habilite el audio**
+   una vez (política de autoplay de los navegadores). Está resuelto con un
+   botón, pero en un dispositivo de cocina hay que pulsarlo al empezar el
+   turno.
