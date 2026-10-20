@@ -1,5 +1,9 @@
 // test/inventario.test.js
 // Descuento de inventario idempotente (ver DOCUMENTO-DESCUENTO-INVENTARIO.md).
+//
+// El stock se descuenta al ENVIAR el pedido (reserva), no al servirlo: entre
+// que el pedido entra a cocina y que se sirve, ese stock ya no esta disponible
+// para otra mesa.
 const { test, before, after, describe } = require('node:test');
 const assert = require('node:assert/strict');
 
@@ -24,6 +28,7 @@ const stockDe = async (nombre) => {
   return encontrado ? encontrado.cantidad : null;
 };
 
+/** Crea una comanda (y con ella reserva el stock). */
 const crearComanda = async (mesa, productos) =>
   (
     await req(base, 'POST', '/api/comandas', {
@@ -82,20 +87,39 @@ after(async () => {
   await servidor.detener();
 });
 
-describe('Descuento de stock', () => {
-  test('Completar una comanda descuenta lo que dice la receta', async () => {
+describe('Reserva al enviar el pedido', () => {
+  test('Crear la comanda ya descuenta el stock', async () => {
     const antesHarina = await stockDe('Harina');
     const antesAzucar = await stockDe('Azucar');
-    const comanda = await crearComanda('M1', ['Pan']);
-    await req(base, 'PATCH', `/api/comandas/${comanda._id}`, { token: ctx.token });
+
+    await crearComanda('M1', ['Pan']);
 
     assert.equal(await stockDe('Harina'), antesHarina - 10);
     assert.equal(await stockDe('Azucar'), antesAzucar - 2);
   });
 
-  test('Completar 5 veces la misma comanda descuenta una sola vez', async () => {
+  test('El stock queda reservado mientras la comanda NO esta servida', async () => {
+    const comandas = await req(base, 'GET', '/api/comandas?pendientes=true', { token: ctx.token });
+    const pendiente = comandas.data.find((c) => c.estado === false);
+
+    assert.ok(pendiente, 'No hay comandas pendientes');
+    assert.equal(pendiente.stockDescontado, true, 'La comanda no tiene el stock reservado');
+  });
+
+  test('Marcar la comanda como servida NO vuelve a descontar', async () => {
     const antes = await stockDe('Harina');
     const comanda = await crearComanda('M2', ['Pan']);
+
+    assert.equal(await stockDe('Harina'), antes - 10);
+
+    await req(base, 'PATCH', `/api/comandas/${comanda._id}`, { token: ctx.token });
+
+    assert.equal(await stockDe('Harina'), antes - 10, 'El servirse descontó otra vez');
+  });
+
+  test('Completar 5 veces la misma comanda no descuenta mas', async () => {
+    const antes = await stockDe('Harina');
+    const comanda = await crearComanda('M3', ['Pan']);
 
     for (let i = 0; i < 5; i++) {
       await req(base, 'PATCH', `/api/comandas/${comanda._id}`, { token: ctx.token });
@@ -104,8 +128,8 @@ describe('Descuento de stock', () => {
     assert.equal(await stockDe('Harina'), antes - 10);
   });
 
-  test('La segunda respuesta indica que ya estaba descontado', async () => {
-    const comanda = await crearComanda('M2b', ['Pan']);
+  test('La segunda respuesta de completar indica que ya estaba descontado', async () => {
+    const comanda = await crearComanda('M3b', ['Pan']);
     await req(base, 'PATCH', `/api/comandas/${comanda._id}`, { token: ctx.token });
     const segunda = await req(base, 'PATCH', `/api/comandas/${comanda._id}`, { token: ctx.token });
 
@@ -113,67 +137,73 @@ describe('Descuento de stock', () => {
     assert.equal(segunda.data.stock.aplicado, false);
   });
 
-  test('8 PATCH simultaneos descuetan una sola vez', async () => {
+  test('Dos comandas distintas reservan el stock por separado', async () => {
     const antes = await stockDe('Harina');
-    const comanda = await crearComanda('M3', ['Pan']);
+    const c1 = await crearComanda('M4', ['Pan']);
+    const c2 = await crearComanda('M5', ['Pan']);
 
-    await Promise.all(
-      Array.from({ length: 8 }, () =>
-        req(base, 'PATCH', `/api/comandas/${comanda._id}`, { token: ctx.token })
-      )
-    );
-
-    assert.equal(await stockDe('Harina'), antes - 10);
+    assert.equal(await stockDe('Harina'), antes - 20);
   });
 
   test('Dos productos con el mismo ingrediente restan la suma', async () => {
     const antes = await stockDe('Harina');
-    const comanda = await crearComanda('M4', ['Pan', 'Bizcocho']);
-    await req(base, 'PATCH', `/api/comandas/${comanda._id}`, { token: ctx.token });
+    await crearComanda('M6', ['Pan', 'Bizcocho']);
 
     assert.equal(await stockDe('Harina'), antes - 15);
   });
-
-  test('Dos comandas distintas se descuentan por separado', async () => {
-    const antes = await stockDe('Harina');
-    const c1 = await crearComanda('M5', ['Pan']);
-    const c2 = await crearComanda('M6', ['Pan']);
-
-    await req(base, 'PATCH', `/api/comandas/${c1._id}`, { token: ctx.token });
-    await req(base, 'PATCH', `/api/comandas/${c2._id}`, { token: ctx.token });
-
-    assert.equal(await stockDe('Harina'), antes - 20);
-  });
 });
 
-describe('Reversion al borrar', () => {
-  test('Borrar una comanda completada devuelve el stock', async () => {
+describe('Cancelar una comanda devuelve el stock', () => {
+  test('Borrar una comanda PENDIENTE devuelve el stock reservado', async () => {
     const antes = await stockDe('Harina');
     const comanda = await crearComanda('M7', ['Pan']);
-    await req(base, 'PATCH', `/api/comandas/${comanda._id}`, { token: ctx.token });
+
+    assert.equal(await stockDe('Harina'), antes - 10);
 
     const res = await req(base, 'DELETE', `/api/comandas/${comanda._id}`, { token: ctx.token });
 
     assert.equal(res.status, 200);
     assert.equal(res.data.stockRevertido, true);
+    assert.equal(await stockDe('Harina'), antes, 'El stock no volvio tras cancelar');
+  });
+
+  test('Borrar una comanda ya servida tambien devuelve el stock', async () => {
+    const antes = await stockDe('Harina');
+    const comanda = await crearComanda('M8', ['Pan']);
+    await req(base, 'PATCH', `/api/comandas/${comanda._id}`, { token: ctx.token });
+
+    const res = await req(base, 'DELETE', `/api/comandas/${comanda._id}`, { token: ctx.token });
+
+    assert.equal(res.status, 200);
+    assert.equal(await stockDe('Harina'), antes);
+  });
+
+  test('Borrar dos veces la misma comanda no devuelve el stock dos veces', async () => {
+    const antes = await stockDe('Harina');
+    const comanda = await crearComanda('M9', ['Pan']);
+
+    await req(base, 'DELETE', `/api/comandas/${comanda._id}`, { token: ctx.token });
+    const segunda = await req(base, 'DELETE', `/api/comandas/${comanda._id}`, { token: ctx.token });
+
+    assert.equal(segunda.status, 404);
     assert.equal(await stockDe('Harina'), antes);
   });
 });
 
 describe('El descuento usa el id del producto, no el nombre', () => {
-  test('Renombrar el producto no rompe el descuento', async () => {
+  test('Renombrar el producto no rompe la reserva', async () => {
     const antes = await stockDe('Harina');
-    const comanda = await crearComanda('M8', ['Pan']);
+    const comanda = await crearComanda('M10', ['Pan']);
 
     await req(base, 'PUT', `/api/productos/${prod._id}`, {
       token: ctx.token,
       body: { nombre: 'Pan Artesanal' },
     });
 
-    await req(base, 'PATCH', `/api/comandas/${comanda._id}`, { token: ctx.token });
+    // La comanda ya habia reservado el stock al crearse; lo que se verifica
+    // es que el descuento se habia hecho contra el producto correcto.
     assert.equal(await stockDe('Harina'), antes - 10);
 
-    // Se devuelve el nombre original para el resto de pruebas.
     await req(base, 'PUT', `/api/productos/${prod._id}`, {
       token: ctx.token,
       body: { nombre: 'Pan' },
@@ -184,13 +214,14 @@ describe('El descuento usa el id del producto, no el nombre', () => {
 describe('Avisos del proceso', () => {
   test('Un plato enviado sin productos no descuenta y deja aviso', async () => {
     const antes = await stockDe('Harina');
-    const comanda = await crearComanda('M9', []);
-
-    const res = await req(base, 'PATCH', `/api/comandas/${comanda._id}`, { token: ctx.token });
+    const res = await req(base, 'POST', '/api/comandas', {
+      token: ctx.token,
+      body: { mesa: 'M11', platillos: [{ nombre: 'Desayuno', precio: 100, productos: [] }] },
+    });
 
     assert.equal(await stockDe('Harina'), antes);
     assert.ok(
-      res.data.stock.alertas.some((a) => a.includes('sin productos seleccionados')),
+      (res.data.stock?.alertas || []).some((a) => a.includes('sin productos seleccionados')),
       'No se registro el aviso de plato sin productos'
     );
   });
@@ -213,29 +244,33 @@ describe('Avisos del proceso', () => {
 
     await req(base, 'DELETE', `/api/ingredientes/${temporal._id}`, { token: ctx.token });
 
-    const comanda = await crearComanda('M10', ['Producto Huerfano']);
-    const res = await req(base, 'PATCH', `/api/comandas/${comanda._id}`, { token: ctx.token });
+    const res = await req(base, 'POST', '/api/comandas', {
+      token: ctx.token,
+      body: { mesa: 'M12', platillos: [{ nombre: 'Desayuno', precio: 100, productos: ['Producto Huerfano'] }] },
+    });
 
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     assert.ok(
-      res.data.stock.alertas.some((a) => a.includes('ya no existe')),
+      (res.data.stock?.alertas || []).some((a) => a.includes('ya no existe')),
       'No se registro el aviso de ingrediente inexistente'
     );
   });
 
-  test('El stock insuficiente deja el valor en negativo y avisa', async () => {
+  test('El stock insuficiente deja el valor en negativo y avisa AL ENVIAR', async () => {
     await req(base, 'PUT', `/api/ingredientes/${ing2._id}`, {
       token: ctx.token,
       body: { cantidad: 1 },
     });
 
-    const comanda = await crearComanda('M11', ['Pan']);
-    const res = await req(base, 'PATCH', `/api/comandas/${comanda._id}`, { token: ctx.token });
+    const res = await req(base, 'POST', '/api/comandas', {
+      token: ctx.token,
+      body: { mesa: 'M13', platillos: [{ nombre: 'Desayuno', precio: 100, productos: ['Pan'] }] },
+    });
 
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     assert.ok((await stockDe('Azucar')) < 0, 'El stock deberia quedar en negativo');
     assert.ok(
-      res.data.stock.alertas.some((a) => a.includes('negativo')),
+      (res.data.stock?.alertas || []).some((a) => a.includes('negativo')),
       'No se registro el aviso de stock negativo'
     );
   });
@@ -243,8 +278,7 @@ describe('Avisos del proceso', () => {
 
 describe('Trazabilidad', () => {
   test('La comanda registra que ya se descontó el stock', async () => {
-    const comanda = await crearComanda('M12', ['Pan']);
-    await req(base, 'PATCH', `/api/comandas/${comanda._id}`, { token: ctx.token });
+    const comanda = await crearComanda('M14', ['Pan']);
 
     const listado = await req(base, 'GET', '/api/comandas', { token: ctx.token });
     const guardada = listado.data.find((c) => c._id === comanda._id);

@@ -1,15 +1,19 @@
 # Descuento de inventario: diseño idempotente
 
-> Cómo el sistema descuenta el stock al completar una comanda, y por qué eso
+> Cómo el sistema descuenta el stock al **enviar** un pedido, y por qué eso
 > nunca descuenta dos veces.
 
 ---
 
 ## 1. El problema
 
-Cuando una comanda se marca como servida, el sistema descuenta del inventario
-los ingredientes de los productos pedidos. Antes de este trabajo, ese
-descuento se ejecutaba de forma libre:
+Cuando un pedido entra a cocina, el stock de sus ingredientes deja de estar
+disponible **en ese momento**, no cuando se sirve. Antes el descuento
+ocurría al marcar la comanda como "servida", y entre una cosa y la otra
+pasabaneas minutos: otra mesa podía pedir lo mismo que ya no había, y el
+sistema no se enteraba hasta que la primera comanda se completaba.
+
+Además, el descuento se ejecutaba de forma libre:
 
 ```js
 comanda.estado = true;
@@ -40,7 +44,7 @@ Una comanda tiene **dos marcas independientes**:
 | Campo | Significado |
 |---|---|
 | `estado` | La comanda fue marcada como servida (lo que ve el personal). |
-| `stockDescontado` | El inventario **ya fue descontado** por esta comanda. |
+| `stockDescontado` | El inventario **ya fue descontado** (reservado) por esta comanda. |
 | `stockDescontadoEn` | Cuándo se hizo el descuento. |
 | `alertasStock` | Avisos del proceso (stock negativo, productos sin resolver…). |
 
@@ -55,10 +59,14 @@ recupera.
   estado=false  ───────►  estado=true  ───────────►  (se borra)
   stock=false             stock=false                stock=false
                              │
-                             └── descuento OK ──► stock=true
+                             └── reserva OK ──► stock=true
                                           └── fallo ──► stock=false
                                                           (reintentable)
 ```
+
+El movimiento del stock ocurre al **crear** la comanda (reserva), no al
+completarla. Marcar como servida ya no mueve el inventario: solo cambia el
+estado.
 
 ---
 
@@ -170,12 +178,31 @@ ingrediente. Ahora son **dos consultas en total** (productos + ingredientes) y
 
 ---
 
-## 5. Reversión al borrar una comanda
+## 5. Reserva de stock: qué ve el mesero
 
-Si una comanda ya descontó stock y luego se borra, el stock **vuelve al
-inventario**. La devolución y el borrado ocurren en la **misma transacción**
-(MongoDB no permite anidar transacciones), así que no puede quedar stock
-devuelto sin comanda borrada, ni comanda borrada sin devolver el stock.
+El descuento ocurre al **crear** la comanda, así que la respuesta del `POST`
+incluye el resultado de la reserva y el frontend muestra los avisos **en el
+momento en que se envía el pedido**, que es cuando el mesero todavía puede
+hacer algo al respecto.
+
+Verificado con dos mesas pidiendo la última porción de un producto:
+
+```
+Mesa 1 envía "Desayuno"  ->  "✅ Comanda enviada con éxito"
+   Harina: 12 kg -> 2 kg
+
+Mesa 2 envía "Desayuno"  ->  "⚠️ Avisos de inventario:
+                                "Harina" quedó en negativo (2 - 10 = -8 kg)"
+```
+
+Antes ese overselling se descubría 20 minutos después, cuando la primera
+comanda se marcaba como servida.
+
+### Cancelar un pedido devuelve el stock
+
+Si el pedido se borra (el cliente cambió de opinión, la cocina se equivocó),
+el stock reservado **vuelve al inventario**, en la misma transacción que el
+borrado:
 
 ```js
 await session.withTransaction(async () => {
@@ -189,6 +216,14 @@ await session.withTransaction(async () => {
   comandaEliminada = await Comanda.findOneAndDelete(filtroEmpresa(req, { _id: id })).session(session);
 });
 ```
+
+Por eso, con la reserva activa, el ciclo completo queda cuadrado:
+
+| Momento | Stock |
+|---|---|
+| Se envía el pedido | −10 (reserva) |
+| Se marca como servida | 0 (no vuelve a descontar) |
+| Se borra la comanda | +10 (vuelve) |
 
 ---
 
@@ -218,14 +253,17 @@ Node, `node --test`):
 
 | Caso | Resultado esperado |
 |---|---|
-| Completar una comanda | El stock baja exactamente lo que dice la receta |
+| **Crear** una comanda | El stock baja inmediatamente (reserva) |
+| Marcar la comanda como servida | El stock **no** baja otra vez |
 | Completar **5 veces** la misma comanda | El stock baja **una sola vez** |
 | **8 PATCH simultáneos** a la misma comanda | El stock baja **una sola vez** |
 | Dos productos con el mismo ingrediente | Se resta la **suma**, en una operación |
-| Borrar una comanda completada | El stock **vuelve** a su valor anterior |
+| **Borrar** una comanda pendiente (reservada) | El stock **vuelve** |
+| **Borrar** una comanda ya servida | El stock **vuelve** |
+| Borrar dos veces la misma comanda | El stock vuelve **una sola vez** |
 | Renombrar el Producto después de pedirlo | El descuento **se sigue aplicando** (por id) |
 | Plato enviado sin opciones | No descuenta y deja **aviso** |
-| Producto con ingrediente borrado | La comanda se completa y deja **aviso** |
+| Producto con ingrediente borrado | La comanda se crea y deja **aviso** |
 | Stock insuficiente | Queda en **negativo** y deja **aviso** |
 | Dos comandas distintas | Se descuenta **una vez cada una** |
 | La comanda guardada | `stockDescontado = true` con su fecha |
@@ -248,15 +286,23 @@ empresa de prueba y la elimina al final, así que no tocan los datos reales.
    no elige nada, se descuenta el producto principal") **no está definida** y
    requiere un campo que distinga el producto principal de los acompañamientos.
 
-2. **El descuento ocurre al marcar "servida", no al enviar el pedido.** Es lo
-   que pidió el enunciado (descuento de stock al completarse la comanda), pero
-   en un restaurante real el stock se reserva al **enviar** el pedido: entre
-   el envío y el servicio, otra mesa puede pedir lo mismo que ya no hay.
+2. **El stock se descuenta al enviar el pedido**, no al servirlo. Es lo que
+   corresponde a una reserva: desde que el pedido entra a cocina, ese stock
+   ya no está disponible para otra mesa. Como contrapartida, **el inventario
+   muestra menos de lo que hay físicamente** (no hay una columna de
+   "reservado" separada). Un modelo con `cantidad` y `reservado` por separado
+   daría un desglose más fino, a costa de más lógica en todas partes.
 
-3. **No hay reserva de stock.** `disponible` en el ingrediente es un booleano
-   manual que nadie actualiza automáticamente a partir del descuento.
+3. **No se bloquea el pedido por falta de stock.** Si no alcanza, la comanda se
+   crea igual, el stock queda en negativo y se avisa. En un restaurante con
+   datos de inventario imperfectos, bloquear pedidos es peor que avisar.
 
-4. **El precio no se recalcula desde el catálogo.** La comanda guarda el
+4. **Un plato enviado sin opciones no descuenta nada.** No hay forma de saber
+   qué se preparó. Se avisa, pero la regla de negocio concreta ("si el cliente
+   no elige nada, se descuenta el producto principal") **no está definida** y
+   requiere un campo que distinga el producto principal de los acompañamientos.
+
+5. **El precio no se recalcula desde el catálogo.** La comanda guarda el
    precio del platillo tal como se envió; si el administrador cambia el
    precio después, el recibo y los reportes usan el precio histórico. Es lo
    correcto para un cierre contable, pero conviene documentarlo.

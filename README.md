@@ -131,6 +131,16 @@ como **servida** desaparece de la pantalla y el backend descuenta el stock
 La cocina **nunca recibe los precios**: el backend los elimina de la respuesta
 para ese rol.
 
+### Reserva de stock
+
+El stock de los ingredientes de un pedido se descuenta **al enviarlo**, no al
+servirlo. Así, desde que el pedido entra a cocina, ese stock deja de estar
+disponible para otra mesa, y el mesero se entera en el momento si el
+restaurante se está vendiendo más de lo que tiene (queda en negativo y se le
+avisa). Si el pedido se cancela, el stock vuelve al inventario.
+
+Ver [`DOCUMENTO-DESCUENTO-INVENTARIO.md`](DOCUMENTO-DESCUENTO-INVENTARIO.md).
+
 ---
 
 ## 5. Documentación técnica
@@ -229,8 +239,11 @@ Están documentadas en detalle en los documentos técnicos. Las principales:
 3. **Un plato enviado sin opciones no descuenta stock.** Se avisa, pero falta
    definir la regla de negocio ("si el cliente no elige, se descuenta el
    producto principal").
-4. **No hay reserva de stock.** El descuento ocurre al marcar la comanda como
-   servida, no al enviarla.
+4. **El stock se descuenta al enviar el pedido** (reserva), no al servirlo:
+   desde que el pedido entra a cocina ese stock ya no está disponible para
+   otra mesa. Como contrapartida, **el inventario no distingue entre lo que
+   hay físicamente y lo que está reservado**, y **no se bloquea el pedido**
+   cuando no alcanza: se crea igual, el stock queda en negativo y se avisa.
 5. **El precio se guarda en la comanda** tal como se envió, para que los
    recibos históricos no cambien si el menú se actualiza.
 6. **La pantalla de cocina no tiene aviso sonoro** cuando entra un pedido

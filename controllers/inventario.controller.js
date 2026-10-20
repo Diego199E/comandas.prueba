@@ -202,13 +202,16 @@ function calcularDeduccion(platillos, ingredientesPorId, empresaComanda) {
  *
  * @param {import('mongoose').ClientSession} session
  * @param {string} comandaId
- * @param {number} signo -1 para descontar (al completar), +1 para revertir (al borrar)
+ * @param {number} signo -1 para descontar (al reservar), +1 para revertir (al borrar)
  */
 async function aplicarMovimiento(session, comandaId, signo) {
   const comanda = await Comanda.findOne({ _id: comandaId }).session(session);
   if (!comanda) return { ok: false, motivo: 'La comanda no existe' };
-  if (comanda.estado !== true) return { ok: false, motivo: 'La comanda no está completada' };
 
+  // NOTA: aqui ya NO se exige que la comanda este "completada". El descuento
+  // se aplica al ENVIAR el pedido (reserva de stock), cuando la comanda
+  // todavia no fue servida. Lo que evita el doble descuento es la
+  // reclamacion atomica de "stockDescontado", no el estado de la comanda.
   const { productosPorId, productosPorNombre, ingredientesPorId } = await cargarDatos(comanda, session);
 
   const platillos = resolverPlatillos(comanda, productosPorId, productosPorNombre);

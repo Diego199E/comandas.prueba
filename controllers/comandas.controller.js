@@ -198,6 +198,17 @@ const crearComanda = async (req, res) => {
 
     await nuevaComanda.save();
 
+    // --- Reserva de stock ----------------------------------------------------
+    // El stock se descuenta al ENVIAR el pedido, no al servirlo. Asi, entre
+    // que el pedido entra a cocina y que se sirve, ese stock ya no esta
+    // disponible para otra mesa.
+    //
+    // Es idempotente: la reclamacion atomica de "stockDescontado" garantiza
+    // que se descuente una sola vez por comanda. Si la comanda ya venia
+    // descontada (por ejemplo, porque se marco como servida antes), no hace
+    // nada.
+    const stock = await descontarIngredientesComanda(nuevaComanda._id);
+
     // Si la mesa existe, se le asocia la comanda y se limpia el borrador:
     // el pedido ya salio de la mesa, ahora vive en la cocina.
     // La mesa NO se libera: los clientes siguen sentados en ella.
@@ -213,7 +224,7 @@ const crearComanda = async (req, res) => {
       console.error('No se pudo actualizar la mesa tras enviar la comanda:', errorMesa);
     }
 
-    res.status(201).json(nuevaComanda);
+    res.status(201).json({ ...nuevaComanda.toObject(), stock });
   } catch (error) {
     console.error(error);
     res.status(500).json({ mensaje: 'Error al crear comanda' });
@@ -281,9 +292,12 @@ const completarComanda = async (req, res) => {
         stock,
       });
     }
-
     // Descuento de inventario. Es idempotente: se aplica como maximo una vez
     // por comanda, aunque se llame muchas veces.
+    //
+    // En las comandas nuevas el stock ya se descontó al CREARLAS (reserva).
+    // Aqui queda como red de seguridad para las comandas anteriores al
+    // cambio, que todavia no tenian el stock descontado.
     const stock = await descontarIngredientesComanda(comanda._id);
     const actualizada = await Comanda.findById(comanda._id).populate('usuario', 'nombre');
 
