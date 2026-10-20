@@ -91,6 +91,10 @@ por empresa a la consulta. No hay excepciones.
 | POST | `/api/mesas` | ✔ | ✔ | — | — | `token`, `empresaActiva`, `Admin\|Mesero` |
 | PUT | `/api/mesas/:id` | ✔ | ✔ | — | — | `token`, `empresaActiva`, `Admin\|Mesero` |
 | DELETE | `/api/mesas/:id` | ✔² | ✔³ | — | — | `token`, `empresaActiva`, `Admin\|Mesero` |
+| GET | `/api/turnos` | ✔ | — | — | — | `token`, `empresaActiva`, `Admin` |
+| GET | `/api/turnos/:id` | ✔ | — | — | — | `token`, `empresaActiva`, `Admin` |
+| POST | `/api/turnos` | ✔ | — | — | — | `token`, `empresaActiva`, `Admin` |
+| PATCH | `/api/turnos/:id/cierre` | ✔ | — | — | — | `token`, `empresaActiva`, `Admin` |
 
 > ¹ **Acceso a nivel de campo:** la cocina recibe las comandas **sin los
 > precios** de los platillos (`precio` y `usaIva` se eliminan de la respuesta).
@@ -101,7 +105,23 @@ por empresa a la consulta. No hay excepciones.
 > ³ Un mesero solo puede borrar una mesa **libre y sin pedido en curso**: si
 > tiene algo en ella, el pedido se perdería (409).
 
-### Las mesas
+### Los turnos de trabajo
+
+Un turno agrupa las comandas creadas mientras está abierto. **Solo puede
+haber un turno abierto por empresa** (si se intenta abrir otro, `409`).
+
+| Quién | Qué puede hacer |
+|---|---|
+| **Admin** | Abrir y cerrar turnos, ver el historial y las ventas de cada turno. |
+| **Mesero / Cocina** | Nada: el turno se asigna **automáticamente** a las comandas que se crean, sin que el mesero tenga que saber de turnos. Si no hay turno abierto, la comanda se opera igual pero sin turno. |
+
+Al cerrar un turno se guarda una **fotografía** de sus ventas (cuántos
+pedidos, cuántos se sirvieron, base gravable, impuesto y total), para que el
+cierre de caja no cambie después si alguien edita una comanda vieja.
+
+> El efectivo inicial y final se registran como datos, pero **no se
+> reconcilian automáticamente**: el proyecto no maneja métodos de pago, así que
+> no se puede saber cuánto del total se cobró en efectivo.
 
 Las mesas se guardan en la base de datos, no en el navegador. Cada mesa
 conserva el **borrador** del pedido en curso, de modo que el mesero puede

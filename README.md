@@ -148,6 +148,22 @@ Detalles que importan:
 - El resaltado visual funciona aunque el sonido esté apagado, por si la
   cocina está de espaldas o en un dispositivo sin audio.
 
+### Turnos de trabajo
+
+Un turno agrupa las comandas que se crean mientras está abierto. El admin lo
+abre desde el panel (con el efectivo inicial) y lo cierra (con el efectivo
+final). **Solo puede haber un turno abierto por empresa**, y las comandas se
+asignan **solas** al turno que esté abierto: el mesero no tiene que saber de
+turnos.
+
+Al cerrar, se guarda una fotografía de las ventas del turno (pedidos, pedidos
+servidos, base gravable, impuesto y total) para que el cierre de caja no
+cambie después.
+
+```
+Turno de la noche · Cerrado · 2 pedidos · 1 servido · $10.000 + $800 = $10.800
+```
+
 ### Reserva de stock
 
 El stock de los ingredientes de un pedido se descuenta **al enviarlo**, no al
@@ -185,6 +201,7 @@ npm test
 | `test/inventario.test.js` | Idempotencia del descuento, acumulación, reversión y avisos. |
 | `test/cocina.test.js` | Consulta de pendientes, estado de preparación y qué ve la cocina. |
 | `test/mesas.test.js` | Persistencia del borrador de las mesas y su ciclo de vida. |
+| `test/turnos.test.js` | Apertura y cierre de turnos, pertenencia de las comandas y cálculo de ventas. |
 
 Las pruebas levantan la API en un puerto libre dentro del propio proceso (no
 hace falta levantar el servidor aparte) y crean sus propias empresas de
@@ -252,7 +269,9 @@ Están documentadas en detalle en los documentos técnicos. Las principales:
    tras un rato de inactividad y eso corta las conexiones WebSocket.
 2. **Las mesas ya son persistentes** (viven en la base de datos y conservan el
    borrador del pedido), pero **no hay un modelo de salón**: no hay capacidad
-   por mesa, ni reserva de clientes, ni turno de apertura y cierre.
+   por mesa, ni reserva de clientes. Los turnos ya agrupan las operaciones por
+   periodo de trabajo, pero no hay un histórico de mesas (qué mesa se usó,
+   cuántas personas, en qué turno).
 3. **Un plato sin composición registrada no puede descontarse.** Con la
    composición por defecto (el plato se prepara tal como está diseñado), esto
    solo pasa si el plato no tiene `contenido` en el catálogo.

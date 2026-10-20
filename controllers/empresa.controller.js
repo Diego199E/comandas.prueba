@@ -10,6 +10,7 @@ const Comanda = require('../models/comanda.model');
 const Producto = require('../models/producto.model');
 const Ingrediente = require('../models/ingrediente.model');
 const Mesa = require('../models/mesa.model');
+const Turno = require('../models/turno.model');
 
 const { JWT_SECRET } = require('../config/env');
 
@@ -35,7 +36,7 @@ const registrarEmpresaConAdmin = async (req, res) => {
       apellidoAdmin,
       correoAdmin,
       contraseñaAdmin,
-      usaIva = true,
+      usaIva,
     } = req.body;
 
     // --- Validaciones ---------------------------------------------------------
@@ -98,7 +99,11 @@ const registrarEmpresaConAdmin = async (req, res) => {
               nombre: String(nombre).trim(),
               nit: nitNormalizado,
               razonSocial: String(razonSocial).trim(),
-              usaIva: Boolean(usaIva),
+              // El regimen de impuesto solo se fija si viene en el body. Si no
+              // viene, aplica el valor por defecto del modelo (false = INC 8%,
+              // el regimen habitual de los restaurantes). Poner aqui un default
+              // True hacia que toda empresa nueva naciera con IVA 19%.
+              ...(usaIva !== undefined ? { usaIva: Boolean(usaIva) } : {}),
               // La empresa queda activa y habilitada desde el inicio: no existe
               // un super-admin que la habilite a posteriori.
               activa: true,
@@ -258,6 +263,7 @@ const eliminarMiEmpresa = async (req, res) => {
     await Producto.deleteMany({ empresa: req.empresaId });
     await Ingrediente.deleteMany({ empresa: req.empresaId });
     await Mesa.deleteMany({ empresa: req.empresaId });
+    await Turno.deleteMany({ empresa: req.empresaId });
 
     const empresa = await Empresa.findByIdAndDelete(req.empresaId);
     if (!empresa) {

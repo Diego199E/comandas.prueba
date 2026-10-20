@@ -69,7 +69,20 @@ const comandasSchema = new mongoose.Schema({
     ref: "Usuario",
   },
 
-  usaIva: { type: Boolean, default: true },
+  // Turno de trabajo al que pertenece la comanda. Se asigna solo: si hay un
+  // turno abierto en la empresa, la comanda queda en el. Si no hay ninguno,
+  // la comanda se opera igual, pero sin turno (un restaurante pequeno puede
+  // funcionar sin abrir turnos).
+  turno: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Turno",
+    default: null,
+  },
+
+  // El regimen con el que se calculo el impuesto de esta comanda.
+  // El controller siempre lo asigna a partir de la empresa, asi que el valor
+  // por defecto solo es una red de seguridad (false = INC 8%).
+  usaIva: { type: Boolean, default: false },
 
   impresa: { type: Boolean, default: false },
   

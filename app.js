@@ -80,6 +80,10 @@ app.use('/api/comandas', comandasRoute);
 const mesasRoutes = require('./routes/mesas.routes');
 app.use('/api/mesas', mesasRoutes);
 
+// Ruta de turnos de trabajo
+const turnosRoutes = require('./routes/turnos.routes');
+app.use('/api/turnos', turnosRoutes);
+
 // Ruta de menues (menú público y privado)
 const menuesRoutes = require('./routes/menues.routes');
 app.use('/api/menues', menuesRoutes);

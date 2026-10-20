@@ -4,6 +4,7 @@ const Empresa = require('../models/empresa.model');
 const Producto = require('../models/producto.model');
 const Plato = require('../models/plato.model');
 const Mesa = require('../models/mesa.model');
+const Turno = require('../models/turno.model');
 const mongoose = require('mongoose');
 const {
   descontarIngredientesComanda,
@@ -240,6 +241,18 @@ const crearComanda = async (req, res) => {
 
     const platillosResueltos = await resolverProductos(conComposicion, empresaIdDe(req));
 
+    // Si hay un turno abierto, la comanda queda asignada a el. Es automatico:
+    // el mesero no tiene que saber de turnos.
+    let turnoAbierto = null;
+    try {
+      turnoAbierto = await Turno.findOne({
+        empresa: empresaIdDe(req),
+        estado: 'Abierto',
+      }).select('_id');
+    } catch (errorTurno) {
+      console.error('No se pudo consultar el turno abierto:', errorTurno);
+    }
+
     const nuevaComanda = new Comanda({
       mesa: mesa.trim(),
       platillos: platillosResueltos,
@@ -247,6 +260,7 @@ const crearComanda = async (req, res) => {
       nitEmpresa: empresa.nit || '',
       razonSocialEmpresa: empresa.razonSocial || '',
       usuario: req.usuario._id, // ← esto permite luego usar populate("usuario")
+      turno: turnoAbierto?._id || null,
       usaIva: empresa.usaIva || false,
     });
 
