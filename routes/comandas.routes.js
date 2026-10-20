@@ -10,6 +10,7 @@ const {
   eliminarTodasLasComandas,
   editarComanda,
   marcarComoImpresa,
+  actualizarEstadoCocina,
 } = require('../controllers/comandas.controller');
 
 const { verificarToken } = require('../middlewares/auth.middleware');
@@ -28,6 +29,13 @@ router.post('/', permitirRoles('Admin', 'Mesero'), crearComanda);
 
 // ✅ Marcar una comanda como impresa
 router.patch('/:id/imprimir', permitirRoles('Admin', 'Mesero'), marcarComoImpresa);
+
+// ✅ Estado del pedido dentro de la cocina (Pendiente -> En preparacion -> Listo)
+router.patch(
+  '/:id/preparacion',
+  permitirRoles('Admin', 'Mesero', 'Cocina'),
+  actualizarEstadoCocina
+);
 
 // ✅ Editar una comanda existente (por ejemplo, cambiar un plato)
 router.put('/:id', permitirRoles('Admin', 'Mesero'), editarComanda);

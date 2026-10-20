@@ -105,10 +105,20 @@ function validarComanda({ mesa, platillos }) {
  * Devuelve TODAS las comandas (completadas y pendientes): el panel
  * administrativo necesita el historial para los reportes y el cliente filtra
  * las pendientes por su cuenta.
+ *
+ * @param {object} req
+ * @param {boolean} [req.query.pendientes] si viene "true", devuelve solo las
+ *   comandas que todavia no fueron servidas (es lo que necesita la cocina).
  */
 const getComandas = async (req, res) => {
   try {
-    const comandas = await Comanda.find(filtroEmpresa(req)).populate('usuario', 'nombre');
+    const filtro = filtroEmpresa(req);
+
+    if (req.query.pendientes === 'true') {
+      filtro.estado = { $ne: true };
+    }
+
+    const comandas = await Comanda.find(filtro).populate('usuario', 'nombre');
 
     // A la cocina se le ocultan los precios: solo necesita el QUE, no el CUANTO.
     const resultado = comandas.map((c) => ocultarPreciosParaCocina(c, req.usuario.rol));
@@ -117,6 +127,45 @@ const getComandas = async (req, res) => {
   } catch (error) {
     console.error('Error al obtener comandas:', error);
     res.status(500).json({ mensaje: 'Error al obtener comandas' });
+  }
+};
+
+/**
+ * Actualiza el estado del pedido dentro de la cocina.
+ *
+ * Es independiente del estado "servida": una comanda puede estar "Lista" en
+ * cocina y seguir sin haber llegado a la mesa.
+ */
+const actualizarEstadoCocina = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { estadoCocina } = soloCampos(req.body, ['estadoCocina']);
+
+    const ESTADOS_COCINA = ['Pendiente', 'En preparacion', 'Listo'];
+
+    if (!ESTADOS_COCINA.includes(estadoCocina)) {
+      return res.status(400).json({
+        mensaje: `Estado de cocina inválido. Valores permitidos: ${ESTADOS_COCINA.join(', ')}`,
+      });
+    }
+
+    const comanda = await Comanda.findOneAndUpdate(
+      filtroEmpresa(req, { _id: id }),
+      { $set: { estadoCocina } },
+      { new: true }
+    ).populate('usuario', 'nombre');
+
+    if (!comanda) {
+      return res.status(404).json({ mensaje: 'Comanda no encontrada' });
+    }
+
+    res.json({
+      mensaje: 'Estado de cocina actualizado',
+      comanda: ocultarPreciosParaCocina(comanda, req.usuario.rol),
+    });
+  } catch (error) {
+    console.error('Error al actualizar el estado de cocina:', error);
+    res.status(500).json({ mensaje: 'Error al actualizar el estado de cocina' });
   }
 };
 
@@ -207,7 +256,7 @@ const completarComanda = async (req, res) => {
       // idempotente) por si la vez anterior fallo a mitad de camino y el
       // stock quedo sin descontar.
       const stock = await descontarIngredientesComanda(existente._id);
-      const actualizada = await Comanda.findById(existente._id);
+      const actualizada = await Comanda.findById(existente._id).populate('usuario', 'nombre');
 
       return res.json({
         mensaje: 'La comanda ya estaba completada',
@@ -219,7 +268,7 @@ const completarComanda = async (req, res) => {
     // Descuento de inventario. Es idempotente: se aplica como maximo una vez
     // por comanda, aunque se llame muchas veces.
     const stock = await descontarIngredientesComanda(comanda._id);
-    const actualizada = await Comanda.findById(comanda._id);
+    const actualizada = await Comanda.findById(comanda._id).populate('usuario', 'nombre');
 
     res.json({
       mensaje: 'Comanda marcada como completada',
@@ -314,4 +363,5 @@ module.exports = {
   eliminarComanda,
   eliminarTodasLasComandas,
   marcarComoImpresa,
+  actualizarEstadoCocina,
 };

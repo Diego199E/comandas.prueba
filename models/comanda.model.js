@@ -26,6 +26,17 @@ const comandasSchema = new mongoose.Schema({
   estado: { type: Boolean, default: false },
   hora: { type: Date, default: Date.now },
 
+  // --- Estado dentro de la cocina ------------------------------------------
+  // "estado" dice si la comanda fue servida (y por tanto si el stock ya se
+  // descontó). "estadoCocina" dice en qué punto del proceso está en cocina.
+  // Son dos cosas distintas: una comanda puede estar "Lista" en cocina y
+  // todavía no haber llegado a la mesa.
+  estadoCocina: {
+    type: String,
+    enum: ['Pendiente', 'En preparacion', 'Listo'],
+    default: 'Pendiente',
+  },
+
   // --- Control del descuento de inventario (idempotencia) -------------------
   // stockDescontado marca que el stock YA fue descontado por esta comanda.
   // Es lo que impide que un doble clic o un reintento descuente dos veces.

@@ -114,10 +114,22 @@ iniciada. También hay una interfaz en `Frontend/crear_empresa.html`.
 |---|---|
 | **Admin** | Todo lo de su empresa: menú, productos, inventario, usuarios, comandas, reportes y datos de la empresa. |
 | **Mesero** | Toma el pedido, lo envia a cocina, ve las comandas de su empresa y marca las servidas. No toca menú, productos, inventario ni usuarios. |
-| **Cocina** | Ve las comandas entrantes (sin precios) y cambia su estado. No ve reportes ni datos de la empresa. |
+| **Cocina** | Ve las comandas pendientes (sin precios) y cambia su estado: Pendiente → En preparación → Lista → Servida. |
 
 El modelo es multi-empresa: todas las empresas comparten base de datos y el
 aislamiento se aplica **en la capa de consulta**, no en la interfaz.
+
+### Pantalla de cocina (`/cocina`)
+
+La ruta que el rol Cocina usa al iniciar sesión. Muestra una tarjeta por pedido
+pendiente con la mesa, el tiempo transcurrido, los platos y sus opciones, y
+tres estados: `Pendiente` → `En preparacion` → `Listo`. Al marcar el pedido
+como **servida** desaparece de la pantalla y el backend descuenta el stock
+(una sola vez, de forma idempotente — ver
+`DOCUMENTO-DESCUENTO-INVENTARIO.md`).
+
+La cocina **nunca recibe los precios**: el backend los elimina de la respuesta
+para ese rol.
 
 ---
 
@@ -144,6 +156,7 @@ npm test
 | `test/seguridad.test.js` | Rutas que antes eran públicas, roles, control de datos de la empresa y login. |
 | `test/idor.test.js` | Aislamiento entre empresas, mass assignment y permisos por rol. |
 | `test/inventario.test.js` | Idempotencia del descuento, acumulación, reversión y avisos. |
+| `test/cocina.test.js` | Consulta de pendientes, estado de preparación y qué ve la cocina. |
 
 Las pruebas levantan la API en un puerto libre dentro del propio proceso (no
 hace falta levantar el servidor aparte) y crean sus propias empresas de
@@ -204,18 +217,17 @@ npm run migrate:impuestos  # Empresas a INC 8% (usaIva = false)
 
 Están documentadas en detalle en los documentos técnicos. Las principales:
 
-1. **No hay vista de cocina.** El rol `Cocina` existe y tiene sus permisos
-   (ve las comandas sin precios y puede marcarlas como servidas), pero la
-   pantalla `/cocina` todavía no existe: la cocina usa la vista de mesero.
-2. **La sincronización es por sondeo, no en tiempo real.** Las comandas se
-   refrescan cada 4 segundos. `socket.io` ya está instalado en el backend pero
-   todavía no se usa.
-3. **Las mesas viven en el estado del navegador.** No hay modelo de mesa en la
+1. **La sincronización es por sondeo, no en tiempo real.** Las comandas se
+   refrescan cada 4 segundos, también en la pantalla de cocina. `socket.io` ya
+   está instalado en el backend pero todavía no se usa.
+2. **Las mesas viven en el estado del navegador.** No hay modelo de mesa en la
    base de datos: si se recarga la página, se pierde el pedido en curso.
-4. **Un plato enviado sin opciones no descuenta stock.** Se avisa, pero falta
+3. **Un plato enviado sin opciones no descuenta stock.** Se avisa, pero falta
    definir la regla de negocio ("si el cliente no elige, se descuenta el
    producto principal").
-5. **No hay reserva de stock.** El descuento ocurre al marcar la comanda como
+4. **No hay reserva de stock.** El descuento ocurre al marcar la comanda como
    servida, no al enviarla.
-6. **El precio se guarda en la comanda** tal como se envió, para que los
+5. **El precio se guarda en la comanda** tal como se envió, para que los
    recibos históricos no cambien si el menú se actualiza.
+6. **La pantalla de cocina no tiene aviso sonoro** cuando entra un pedido
+   nuevo: el pedido aparece al refrescar, pero no hay "ding".

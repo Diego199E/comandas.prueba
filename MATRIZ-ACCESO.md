@@ -82,6 +82,7 @@ por empresa a la consulta. No hay excepciones.
 | POST | `/api/comandas` | ✔ | ✔ | — | — | `token`, `empresaActiva`, `Admin\|Mesero` |
 | PUT | `/api/comandas/:id` | ✔ | ✔ | — | — | `token`, `empresaActiva`, `Admin\|Mesero` |
 | PATCH | `/api/comandas/:id` | ✔ | ✔ | ✔ | — | `token`, `empresaActiva`, `Admin\|Mesero\|Cocina` |
+| PATCH | `/api/comandas/:id/preparacion` | ✔ | ✔ | ✔ | — | `token`, `empresaActiva`, `Admin\|Mesero\|Cocina` |
 | PATCH | `/api/comandas/:id/imprimir` | ✔ | ✔ | — | — | `token`, `empresaActiva`, `Admin\|Mesero` |
 | DELETE | `/api/comandas/:id` | ✔ | — | — | — | `token`, `empresaActiva`, `Admin` |
 | DELETE | `/api/comandas` (todas) | ✔ | — | — | — | `token`, `empresaActiva`, `Admin` |
@@ -89,6 +90,17 @@ por empresa a la consulta. No hay excepciones.
 > ¹ **Acceso a nivel de campo:** la cocina recibe las comandas **sin los
 > precios** de los platillos (`precio` y `usaIva` se eliminan de la respuesta).
 > La cocina necesita saber *qué* pidió el cliente, no *cuánto* costó.
+
+### La vista de cocina
+
+| Elemento | Cómo se resuelve |
+|---|---|
+| Qué pedidos ve | `GET /api/comandas?pendientes=true` → solo las comandas **no servidas** (`estado != true`). |
+| Qué precio ve | Ninguno: el backend elimina `precio` y `usaIva` de la respuesta para el rol `Cocina`. |
+| En qué punto está cada pedido | Campo `estadoCocina`: `Pendiente` → `En preparacion` → `Listo`. Se cambia con `PATCH /api/comandas/:id/preparacion`. |
+| Cuándo se descuenta el stock | Al marcar el pedido como **servida** (`PATCH /api/comandas/:id`), una sola vez. |
+| Quién marca el pedido como servido | Admin, Mesero o Cocina. |
+| Actualización de la pantalla | Sondeo cada 4 segundos (mismo mecanismo que el resto de la app). |
 
 ### Notas de la matriz
 
