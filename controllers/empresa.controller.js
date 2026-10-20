@@ -9,6 +9,7 @@ const Plato = require('../models/plato.model');
 const Comanda = require('../models/comanda.model');
 const Producto = require('../models/producto.model');
 const Ingrediente = require('../models/ingrediente.model');
+const Mesa = require('../models/mesa.model');
 
 const { JWT_SECRET } = require('../config/env');
 
@@ -256,6 +257,7 @@ const eliminarMiEmpresa = async (req, res) => {
     await Comanda.deleteMany({ empresa: req.empresaId });
     await Producto.deleteMany({ empresa: req.empresaId });
     await Ingrediente.deleteMany({ empresa: req.empresaId });
+    await Mesa.deleteMany({ empresa: req.empresaId });
 
     const empresa = await Empresa.findByIdAndDelete(req.empresaId);
     if (!empresa) {

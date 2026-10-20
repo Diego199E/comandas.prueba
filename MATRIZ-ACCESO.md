@@ -79,6 +79,7 @@ por empresa a la consulta. No hay excepciones.
 | POST/PUT/DELETE | `/api/menues[/:id]` | ✔ | — | — | — | `token`, `empresaActiva`, `Admin` |
 | GET | `/api/menues/public/:slug` | ✔ | ✔ | ✔ | **P** | — |
 | GET | `/api/comandas` | ✔ | ✔ | ✔¹ | — | `token`, `empresaActiva` |
+| GET | `/api/comandas?pendientes=true` | ✔ | ✔ | ✔¹ | — | `token`, `empresaActiva` |
 | POST | `/api/comandas` | ✔ | ✔ | — | — | `token`, `empresaActiva`, `Admin\|Mesero` |
 | PUT | `/api/comandas/:id` | ✔ | ✔ | — | — | `token`, `empresaActiva`, `Admin\|Mesero` |
 | PATCH | `/api/comandas/:id` | ✔ | ✔ | ✔ | — | `token`, `empresaActiva`, `Admin\|Mesero\|Cocina` |
@@ -86,10 +87,33 @@ por empresa a la consulta. No hay excepciones.
 | PATCH | `/api/comandas/:id/imprimir` | ✔ | ✔ | — | — | `token`, `empresaActiva`, `Admin\|Mesero` |
 | DELETE | `/api/comandas/:id` | ✔ | — | — | — | `token`, `empresaActiva`, `Admin` |
 | DELETE | `/api/comandas` (todas) | ✔ | — | — | — | `token`, `empresaActiva`, `Admin` |
+| GET | `/api/mesas` | ✔ | ✔ | — | — | `token`, `empresaActiva`, `Admin\|Mesero` |
+| POST | `/api/mesas` | ✔ | ✔ | — | — | `token`, `empresaActiva`, `Admin\|Mesero` |
+| PUT | `/api/mesas/:id` | ✔ | ✔ | — | — | `token`, `empresaActiva`, `Admin\|Mesero` |
+| DELETE | `/api/mesas/:id` | ✔² | ✔³ | — | — | `token`, `empresaActiva`, `Admin\|Mesero` |
 
 > ¹ **Acceso a nivel de campo:** la cocina recibe las comandas **sin los
 > precios** de los platillos (`precio` y `usaIva` se eliminan de la respuesta).
 > La cocina necesita saber *qué* pidió el cliente, no *cuánto* costó.
+>
+> ² Un administrador puede borrar cualquier mesa.
+>
+> ³ Un mesero solo puede borrar una mesa **libre y sin pedido en curso**: si
+> tiene algo en ella, el pedido se perdería (409).
+
+### Las mesas
+
+Las mesas se guardan en la base de datos, no en el navegador. Cada mesa
+conserva el **borrador** del pedido en curso, de modo que el mesero puede
+recargar la página (o cambiar de dispositivo) sin perder lo que llevaba
+preparado.
+
+| Momento | Qué pasa con la mesa |
+|---|---|
+| El mesero agrega un plato | Se guarda el borrador en la mesa |
+| Se envía la comanda | La mesa queda **Ocupada**, asociada a la comanda, y el borrador se limpia (el pedido ya está en la cocina) |
+| Se marca la comanda como servida | La mesa **no** se libera: los clientes siguen sentados |
+| El mesero libera la mesa | Vuelve a **Libre**, sin borrador y sin comanda asociada |
 
 ### La vista de cocina
 

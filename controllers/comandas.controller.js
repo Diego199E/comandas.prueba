@@ -2,6 +2,7 @@
 const Comanda = require('../models/comanda.model');
 const Empresa = require('../models/empresa.model');
 const Producto = require('../models/producto.model');
+const Mesa = require('../models/mesa.model');
 const mongoose = require('mongoose');
 const {
   descontarIngredientesComanda,
@@ -196,6 +197,22 @@ const crearComanda = async (req, res) => {
     });
 
     await nuevaComanda.save();
+
+    // Si la mesa existe, se le asocia la comanda y se limpia el borrador:
+    // el pedido ya salio de la mesa, ahora vive en la cocina.
+    // La mesa NO se libera: los clientes siguen sentados en ella.
+    try {
+      await Mesa.findOneAndUpdate(
+        { empresa: empresaIdDe(req), nombre: nuevaComanda.mesa },
+        { $set: { comandaActual: nuevaComanda._id, estado: 'Ocupada', platillos: [] } },
+        { new: true }
+      );
+    } catch (errorMesa) {
+      // Un fallo al registrar la mesa no debe impedir crear la comanda:
+      // el pedido ya esta en la cocina, que es lo importante.
+      console.error('No se pudo actualizar la mesa tras enviar la comanda:', errorMesa);
+    }
+
     res.status(201).json(nuevaComanda);
   } catch (error) {
     console.error(error);

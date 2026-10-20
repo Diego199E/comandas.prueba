@@ -157,6 +157,7 @@ npm test
 | `test/idor.test.js` | Aislamiento entre empresas, mass assignment y permisos por rol. |
 | `test/inventario.test.js` | Idempotencia del descuento, acumulación, reversión y avisos. |
 | `test/cocina.test.js` | Consulta de pendientes, estado de preparación y qué ve la cocina. |
+| `test/mesas.test.js` | Persistencia del borrador de las mesas y su ciclo de vida. |
 
 Las pruebas levantan la API en un puerto libre dentro del propio proceso (no
 hace falta levantar el servidor aparte) y crean sus propias empresas de
@@ -219,9 +220,12 @@ Están documentadas en detalle en los documentos técnicos. Las principales:
 
 1. **La sincronización es por sondeo, no en tiempo real.** Las comandas se
    refrescan cada 4 segundos, también en la pantalla de cocina. `socket.io` ya
-   está instalado en el backend pero todavía no se usa.
-2. **Las mesas viven en el estado del navegador.** No hay modelo de mesa en la
-   base de datos: si se recarga la página, se pierde el pedido en curso.
+   está instalado en el backend pero no se usa: la opción elegida fue el
+   sondeo, porque el plan gratuito del hosting del backend apaga la instancia
+   tras un rato de inactividad y eso corta las conexiones WebSocket.
+2. **Las mesas ya son persistentes** (viven en la base de datos y conservan el
+   borrador del pedido), pero **no hay un modelo de salón**: no hay capacidad
+   por mesa, ni reserva de clientes, ni turno de apertura y cierre.
 3. **Un plato enviado sin opciones no descuenta stock.** Se avisa, pero falta
    definir la regla de negocio ("si el cliente no elige, se descuenta el
    producto principal").
