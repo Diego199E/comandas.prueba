@@ -1,57 +1,86 @@
-const Producto = require('../models/plato.model');
+// controllers/platos.controller.js
+const Plato = require('../models/plato.model');
+
+const { filtroEmpresa, empresaIdDe } = require('../utils/scope');
+const { soloCampos } = require('../utils/campos');
+
+// Campos que el cliente puede escribir de un plato.
+// 'empresa' y '_id' quedan fuera: son del servidor.
+const CAMPOS_PLATO = ['nombre', 'precio', 'cantidad', 'disponible', 'contenido'];
 
 // Obtener platos solo de la empresa del usuario
 const obtenerPlatos = async (req, res) => {
   try {
-    const productos = await Producto.find({ empresa: req.usuario.empresa }).populate("empresa");
-    res.json(productos);
+    const platos = await Plato.find(filtroEmpresa(req)).populate('empresa');
+    res.json(platos);
   } catch (error) {
-    res.status(500).json({ mensaje: 'Error al obtener los productos', error });
+    console.error('Error al obtener los platos:', error);
+    res.status(500).json({ mensaje: 'Error al obtener los platos' });
   }
 };
 
 const agregarPlato = async (req, res) => {
   try {
-    const nuevoProducto = new Producto({
-      ...req.body,
-      empresa: req.usuario.empresa, // Asociar con empresa
+    const datos = soloCampos(req.body, CAMPOS_PLATO);
+
+    if (!datos.nombre || datos.precio === undefined) {
+      return res.status(400).json({ mensaje: 'El nombre y el precio son obligatorios' });
+    }
+
+    const nuevoPlato = new Plato({
+      ...datos,
+      empresa: empresaIdDe(req), // La empresa SIEMPRE es la del usuario autenticado.
     });
-    const productoGuardado = await nuevoProducto.save();
-    res.status(201).json(productoGuardado);
+
+    const platoGuardado = await nuevoPlato.save();
+    res.status(201).json(platoGuardado);
   } catch (error) {
-    res.status(500).json({ mensaje: 'Error al agregar el producto', error });
+    console.error('Error al agregar el plato:', error);
+    res.status(500).json({ mensaje: 'Error al agregar el plato' });
   }
 };
 
 const actualizarPlato = async (req, res) => {
   try {
-    const productoActualizado = await Producto.findByIdAndUpdate(
-      req.params.id,
-      req.body,
+    const datos = soloCampos(req.body, CAMPOS_PLATO);
+
+    if (Object.keys(datos).length === 0) {
+      return res.status(400).json({ mensaje: 'No hay campos para actualizar' });
+    }
+
+    // El filtro por empresa impide modificar platos de otra empresa.
+    const platoActualizado = await Plato.findOneAndUpdate(
+      filtroEmpresa(req, { _id: req.params.id }),
+      datos,
       { new: true }
     );
 
-    if (!productoActualizado) {
-      return res.status(404).json({ mensaje: 'Producto no encontrado' });
+    if (!platoActualizado) {
+      return res.status(404).json({ mensaje: 'Plato no encontrado' });
     }
 
-    res.json(productoActualizado);
+    res.json(platoActualizado);
   } catch (error) {
-    res.status(400).json({ mensaje: 'Error al actualizar el Producto', error });
+    console.error('Error al actualizar el plato:', error);
+    res.status(400).json({ mensaje: 'Error al actualizar el plato' });
   }
 };
 
 const eliminarPlato = async (req, res) => {
   try {
-    const productoEliminado = await Producto.findByIdAndDelete(req.params.id);
+    // El filtro por empresa impide borrar platos de otra empresa.
+    const platoEliminado = await Plato.findOneAndDelete(
+      filtroEmpresa(req, { _id: req.params.id })
+    );
 
-    if (!productoEliminado) {
-      return res.status(404).json({ mensaje: 'Producto no encontrado' });
+    if (!platoEliminado) {
+      return res.status(404).json({ mensaje: 'Plato no encontrado' });
     }
 
-    res.json({ mensaje: 'Producto eliminado correctamente' });
+    res.json({ mensaje: 'Plato eliminado correctamente' });
   } catch (error) {
-    res.status(500).json({ mensaje: 'Error al eliminar el Producto', error });
+    console.error('Error al eliminar el plato:', error);
+    res.status(500).json({ mensaje: 'Error al eliminar el plato' });
   }
 };
 

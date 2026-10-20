@@ -1,18 +1,32 @@
+// controllers/menues.controller.js
 import Plato from "../models/plato.model.js";
 import Empresa from "../models/empresa.model.js";
+
+import { filtroEmpresa, empresaIdDe } from "../utils/scope.js";
+import { soloCampos } from "../utils/campos.js";
+
+// Campos que el cliente puede escribir de un plato de menu.
+// 'empresa' y '_id' quedan fuera: son del servidor.
+const CAMPOS_MENU = ["nombre", "productos"];
 
 // Crear plato del menú
 export const crearPlatoMenu = async (req, res) => {
   try {
-    const { nombre, productos } = req.body;
+    const { nombre, productos } = soloCampos(req.body, CAMPOS_MENU);
+
+    if (!nombre) {
+      return res.status(400).json({ error: "El nombre del plato es obligatorio" });
+    }
+
     const plato = new Plato({
       nombre,
       productos,
-      empresa: req.usuario.empresa,
+      empresa: empresaIdDe(req),
     });
     await plato.save();
     res.status(201).json(plato);
   } catch (error) {
+    console.error("Error al crear plato de menú:", error);
     res.status(500).json({ error: "Error al crear plato de menú" });
   }
 };
@@ -20,9 +34,10 @@ export const crearPlatoMenu = async (req, res) => {
 // Obtener platos del menú
 export const obtenerPlatosMenu = async (req, res) => {
   try {
-    const platos = await Plato.find({ empresa: req.usuario.empresa }).populate("productos");
+    const platos = await Plato.find(filtroEmpresa(req));
     res.json(platos);
   } catch (error) {
+    console.error("Error al obtener platos del menú:", error);
     res.status(500).json({ error: "Error al obtener platos del menú" });
   }
 };
@@ -31,13 +46,24 @@ export const obtenerPlatosMenu = async (req, res) => {
 export const actualizarPlatoMenu = async (req, res) => {
   try {
     const { id } = req.params;
-    const plato = await Plato.findOneAndUpdate(
-      { _id: id, empresa: req.usuario.empresa },
-      req.body,
-      { new: true }
-    );
+    const datos = soloCampos(req.body, CAMPOS_MENU);
+
+    if (Object.keys(datos).length === 0) {
+      return res.status(400).json({ error: "No hay campos para actualizar" });
+    }
+
+    // El filtro por empresa impide modificar platos de otra empresa.
+    const plato = await Plato.findOneAndUpdate(filtroEmpresa(req, { _id: id }), datos, {
+      new: true,
+    });
+
+    if (!plato) {
+      return res.status(404).json({ error: "Plato no encontrado" });
+    }
+
     res.json(plato);
   } catch (error) {
+    console.error("Error al actualizar plato del menú:", error);
     res.status(500).json({ error: "Error al actualizar plato del menú" });
   }
 };
@@ -46,13 +72,18 @@ export const actualizarPlatoMenu = async (req, res) => {
 export const eliminarPlatoMenu = async (req, res) => {
   try {
     const { id } = req.params;
-    await Plato.findOneAndDelete({ _id: id, empresa: req.usuario.empresa });
+    const plato = await Plato.findOneAndDelete(filtroEmpresa(req, { _id: id }));
+
+    if (!plato) {
+      return res.status(404).json({ error: "Plato no encontrado" });
+    }
+
     res.json({ mensaje: "Plato de menú eliminado" });
   } catch (error) {
+    console.error("Error al eliminar plato de menú:", error);
     res.status(500).json({ error: "Error al eliminar plato de menú" });
   }
 };
-
 
 // Obtener platos del menú de una empresa (público, sin token)
 export const obtenerPlatosMenuPublico = async (req, res) => {
@@ -78,4 +109,3 @@ export const obtenerPlatosMenuPublico = async (req, res) => {
     res.status(500).json({ error: "Error al obtener menú público" });
   }
 };
-

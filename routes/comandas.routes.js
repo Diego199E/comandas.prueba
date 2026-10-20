@@ -1,3 +1,4 @@
+// routes/comandas.routes.js
 const express = require('express');
 const router = express.Router();
 
@@ -19,22 +20,23 @@ const { permitirRoles } = require('../middlewares/rol.middleware');
 router.use(verificarToken, verificarEmpresaActiva);
 
 // ✅ Obtener todas las comandas (activas o no) de la empresa
+// La cocina recibe las comandas sin precios (ver ocultarPreciosParaCocina).
 router.get('/', getComandas);
 
-// ✅ Crear una nueva comanda
-router.post('/', crearComanda);
+// ✅ Crear una nueva comanda (quien toma pedidos: admin o mesero)
+router.post('/', permitirRoles('Admin', 'Mesero'), crearComanda);
 
 // ✅ Marcar una comanda como impresa
-router.patch('/:id/imprimir', marcarComoImpresa);
+router.patch('/:id/imprimir', permitirRoles('Admin', 'Mesero'), marcarComoImpresa);
 
 // ✅ Editar una comanda existente (por ejemplo, cambiar un plato)
-router.put('/:id', editarComanda);
+router.put('/:id', permitirRoles('Admin', 'Mesero'), editarComanda);
 
-// ✅ Marcar una comanda como completada
-router.patch('/:id', completarComanda);
+// ✅ Marcar una comanda como completada (cocina tambien puede hacerlo)
+router.patch('/:id', permitirRoles('Admin', 'Mesero', 'Cocina'), completarComanda);
 
-// ✅ Eliminar una comanda
-router.delete('/:id', eliminarComanda);
+// ✅ Eliminar una comanda (solo Admin: es una accion sobre el historial)
+router.delete('/:id', permitirRoles('Admin'), eliminarComanda);
 
 // ✅ Eliminar todas las comandas de la empresa actual (solo Admin)
 router.delete('/', permitirRoles('Admin'), eliminarTodasLasComandas);

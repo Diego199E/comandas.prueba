@@ -1,6 +1,7 @@
+// routes/platos.routes.js
 const express = require('express');
 const router = express.Router();
-const { 
+const {
     obtenerPlatos,
     agregarPlato,
     actualizarPlato,
@@ -14,8 +15,8 @@ const {verificarEmpresaActiva} = require('../middlewares/empresa.middleware');
 router.get('/', verificarToken, verificarEmpresaActiva, obtenerPlatos);
 
 // Solo admins con empresa activa pueden modificar platos
-router.post('/', verificarToken,verificarEmpresaActiva ,permitirRoles('Admin'), agregarPlato);
-router.put('/:id', verificarToken, permitirRoles('Admin'), actualizarPlato);
-router.delete('/:id', verificarToken, permitirRoles('Admin'), eliminarPlato);
+router.post('/', verificarToken, verificarEmpresaActiva, permitirRoles('Admin'), agregarPlato);
+router.put('/:id', verificarToken, verificarEmpresaActiva, permitirRoles('Admin'), actualizarPlato);
+router.delete('/:id', verificarToken, verificarEmpresaActiva, permitirRoles('Admin'), eliminarPlato);
 
 module.exports = router;
