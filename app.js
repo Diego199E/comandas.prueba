@@ -2,7 +2,7 @@
 // config/env se carga PRIMERO: es el modulo que lee el .env.
 // Si se cargara despues, process.env.CLIENT_ORIGIN y JWT_SECRET estarian
 // vacios en este punto.
-const { CLIENT_ORIGIN, esProduccion } = require('./config/env');
+const { CLIENT_ORIGIN, esDesarrollo } = require('./config/env');
 
 const express = require('express');
 const cors = require('cors');
@@ -15,14 +15,40 @@ app.set('trust proxy', 1);
 // --- Middlewares basicos -------------------------------------------------------
 
 // CORS restringido a los origenes declarados en CLIENT_ORIGIN.
-// Antes era cors() abierto: cualquier sitio del mundo podia llamar la API.
+//
+// En DESARROLLO se permite cualquier PUERTO de localhost: el puerto del
+// servidor de Vite no es fijo (si otro proyecto del equipo ya ocupa el 5173,
+// Vite arranca en el 5174) y con una lista fija la app se rompia con
+// "blocked by CORS policy" sin explicacion.
+//
+// En PRODUCCION la lista es estricta: solo el dominio del frontend.
 const origenesPermitidos = CLIENT_ORIGIN.split(',')
   .map((o) => o.trim())
   .filter(Boolean);
 
+const esLocalhost = (origen) => {
+  try {
+    const { hostname } = new URL(origen);
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
+  } catch {
+    return false;
+  }
+};
+
+const permitirOrigen = (origen, callback) => {
+  // Peticiones sin Origin (curl, apps moviles, health checks): se permiten.
+  if (!origen) return callback(null, false);
+
+  if (esDesarrollo && esLocalhost(origen)) {
+    return callback(null, true);
+  }
+
+  return callback(null, origenesPermitidos.includes(origen));
+};
+
 app.use(
   cors({
-    origin: origenesPermitidos.length > 0 ? origenesPermitidos : false,
+    origin: permitirOrigen,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     maxAge: 600,

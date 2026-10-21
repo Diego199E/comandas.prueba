@@ -60,6 +60,7 @@ if (!esProduccion && !process.env.JWT_SECRET) {
 module.exports = {
   NODE_ENV,
   esProduccion,
+  esDesarrollo: !esProduccion,
   PORT,
   MONGO_URI,
   JWT_SECRET,
