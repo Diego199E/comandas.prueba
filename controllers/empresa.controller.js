@@ -305,7 +305,7 @@ const obtenerEmpresaPorId = async (req, res) => {
  */
 const actualizarEmpresaSuper = async (req, res) => {
   try {
-    const { nombre, nit, razonSocial, usaIva, activa, pagoRealizado } = req.body;
+    const { nombre, nit, razonSocial, usaIva, activa, pagoRealizado, slug } = req.body;
     const datos = {};
     if (nombre !== undefined) datos.nombre = String(nombre).trim();
     if (nit !== undefined) datos.nit = normalizarNit(nit);
@@ -313,6 +313,7 @@ const actualizarEmpresaSuper = async (req, res) => {
     if (usaIva !== undefined) datos.usaIva = Boolean(usaIva);
     if (activa !== undefined) datos.activa = Boolean(activa);
     if (pagoRealizado !== undefined) datos.pagoRealizado = Boolean(pagoRealizado);
+    if (slug !== undefined) datos.slug = String(slug).trim().toLowerCase();
 
     if (Object.keys(datos).length === 0) {
       return res.status(400).json({ mensaje: 'No hay campos para actualizar' });
