@@ -6,6 +6,10 @@ const {
   obtenerMiEmpresa,
   actualizarMiEmpresa,
   eliminarMiEmpresa,
+  listarEmpresas,
+  obtenerEmpresaPorId,
+  actualizarEmpresaSuper,
+  eliminarEmpresaSuper,
 } = require('../controllers/empresa.controller');
 
 const { verificarToken } = require('../middlewares/auth.middleware');
@@ -22,5 +26,12 @@ router.post('/registro', registrarEmpresaConAdmin);
 router.get('/mi', verificarToken, obtenerMiEmpresa);
 router.put('/mi', verificarToken, permitirRoles('Admin'), actualizarMiEmpresa);
 router.delete('/mi', verificarToken, permitirRoles('Admin'), eliminarMiEmpresa);
+
+// --- Super admin (local): CRUD completo sobre la tabla empresa ----------------
+// Rutas publicas para uso en entorno local (sin autenticacion).
+router.get('/listar', listarEmpresas);
+router.get('/:id', obtenerEmpresaPorId);
+router.put('/:id', actualizarEmpresaSuper);
+router.delete('/:id', eliminarEmpresaSuper);
 
 module.exports = router;

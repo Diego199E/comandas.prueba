@@ -271,9 +271,108 @@ const eliminarMiEmpresa = async (req, res) => {
   }
 };
 
+/**
+ * SUPER ADMIN (local): lista todas las empresas registradas.
+ */
+const listarEmpresas = async (req, res) => {
+  try {
+    const empresas = await Empresa.find().sort({ createdAt: -1 });
+    res.json(empresas);
+  } catch (error) {
+    console.error('Error al listar empresas:', error);
+    res.status(500).json({ mensaje: 'Error al listar las empresas' });
+  }
+};
+
+/**
+ * SUPER ADMIN (local): obtiene una empresa por id.
+ */
+const obtenerEmpresaPorId = async (req, res) => {
+  try {
+    const empresa = await Empresa.findById(req.params.id);
+    if (!empresa) {
+      return res.status(404).json({ mensaje: 'Empresa no encontrada' });
+    }
+    res.json(empresa);
+  } catch (error) {
+    console.error('Error al obtener la empresa:', error);
+    res.status(500).json({ mensaje: 'Error al obtener la empresa' });
+  }
+};
+
+/**
+ * SUPER ADMIN (local): actualiza cualquier campo de una empresa.
+ */
+const actualizarEmpresaSuper = async (req, res) => {
+  try {
+    const { nombre, nit, razonSocial, usaIva, activa, pagoRealizado } = req.body;
+    const datos = {};
+    if (nombre !== undefined) datos.nombre = String(nombre).trim();
+    if (nit !== undefined) datos.nit = normalizarNit(nit);
+    if (razonSocial !== undefined) datos.razonSocial = String(razonSocial).trim();
+    if (usaIva !== undefined) datos.usaIva = Boolean(usaIva);
+    if (activa !== undefined) datos.activa = Boolean(activa);
+    if (pagoRealizado !== undefined) datos.pagoRealizado = Boolean(pagoRealizado);
+
+    if (Object.keys(datos).length === 0) {
+      return res.status(400).json({ mensaje: 'No hay campos para actualizar' });
+    }
+
+    // Unicidad de nombre / nit
+    if (datos.nombre) {
+      const repetida = await Empresa.findOne({ _id: { $ne: req.params.id }, nombre: datos.nombre });
+      if (repetida) return res.status(400).json({ mensaje: 'Ya existe una empresa con ese nombre' });
+    }
+    if (datos.nit) {
+      const repetida = await Empresa.findOne({ _id: { $ne: req.params.id }, nit: datos.nit });
+      if (repetida) return res.status(400).json({ mensaje: 'Ya existe una empresa con ese NIT' });
+    }
+
+    const empresa = await Empresa.findByIdAndUpdate(req.params.id, datos, { new: true });
+    if (!empresa) {
+      return res.status(404).json({ mensaje: 'Empresa no encontrada' });
+    }
+    res.json({ mensaje: 'Empresa actualizada', empresa });
+  } catch (error) {
+    console.error('Error al actualizar la empresa:', error);
+    res.status(500).json({ mensaje: 'Error al actualizar la empresa' });
+  }
+};
+
+/**
+ * SUPER ADMIN (local): elimina una empresa y todos sus datos relacionados.
+ */
+const eliminarEmpresaSuper = async (req, res) => {
+  try {
+    const empresaId = req.params.id;
+    const empresa = await Empresa.findById(empresaId);
+    if (!empresa) {
+      return res.status(404).json({ mensaje: 'Empresa no encontrada' });
+    }
+
+    // Cascada
+    await Usuario.deleteMany({ empresa: empresaId });
+    await Plato.deleteMany({ empresa: empresaId });
+    await Comanda.deleteMany({ empresa: empresaId });
+    await Producto.deleteMany({ empresa: empresaId });
+    await Ingrediente.deleteMany({ empresa: empresaId });
+    await Mesa.deleteMany({ empresa: empresaId });
+
+    await Empresa.findByIdAndDelete(empresaId);
+    res.json({ mensaje: 'Empresa y datos relacionados eliminados con éxito' });
+  } catch (error) {
+    console.error('Error al eliminar la empresa:', error);
+    res.status(500).json({ mensaje: 'Error al eliminar la empresa' });
+  }
+};
+
 module.exports = {
   registrarEmpresaConAdmin,
   obtenerMiEmpresa,
   actualizarMiEmpresa,
   eliminarMiEmpresa,
+  listarEmpresas,
+  obtenerEmpresaPorId,
+  actualizarEmpresaSuper,
+  eliminarEmpresaSuper,
 };
